@@ -47,10 +47,22 @@ module Llvm (
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
         -- * Pretty Printing
-        ppLit, ppName, ppPlainName,
-        ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
-        ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
-        ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, ppLlvmMetas, ppLlvmMeta,
+        --ppLit,
+        --ppName,
+        ppPlainName,
+        --ppLlvmModule,
+        --ppLlvmComments,
+        --ppLlvmComment,
+        ppLlvmGlobals,
+        ppLlvmGlobal,
+        ppLlvmFunctionDecls,
+        ppLlvmFunctionDecl,
+        ppLlvmFunctions,
+        ppLlvmFunction,
+        ppLlvmAlias,
+        ppLlvmAliases,
+        ppLlvmMetas,
+        ppLlvmMeta,
 
     ) where
 

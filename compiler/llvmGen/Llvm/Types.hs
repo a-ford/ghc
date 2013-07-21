@@ -22,6 +22,8 @@ import PprBase
 
 import GHC.Float
 
+--import qualified LLVM.Core
+
 -- -----------------------------------------------------------------------------
 -- * LLVM Basic Types and Variables
 --
@@ -57,7 +59,10 @@ data LlvmType
   -- | Function type, used to create pointers to functions
   | LMFunction LlvmFunctionDecl
   deriving (Eq)
-
+{-
+instance LLVMOutputable LlvmType where
+  toLlvm (LMInt size) = LLVM.Core.
+-}
 instance Outputable LlvmType where
   ppr (LMInt size     ) = char 'i' <> ppr size
   ppr (LMFloat        ) = text "float"
@@ -370,7 +375,7 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
         funcAlign     :: LMAlign
   }
   deriving (Eq)
-
+{-
 instance Outputable LlvmFunctionDecl where
   ppr (LlvmFunctionDecl n l c r varg p a)
     = let align = case a of
@@ -378,7 +383,7 @@ instance Outputable LlvmFunctionDecl where
                        Nothing -> empty
       in ppr l <+> ppr c <+> ppr r <+> char '@' <> ftext n <>
              lparen <> ppParams varg p <> rparen <> align
-
+-}
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
 type LlvmParameter = (LlvmType, [LlvmParamAttr])
@@ -717,7 +722,7 @@ data LlvmCmpOp
   | LM_CMP_Fge -- ^ Float greater than or equal
   | LM_CMP_Flt -- ^ Float less than
   | LM_CMP_Fle -- ^ Float less than or equal
-  deriving (Eq)
+  deriving (Eq, Show)
 
 instance Outputable LlvmCmpOp where
   ppr LM_CMP_Eq  = text "eq"
