@@ -41,7 +41,7 @@ type LMString = FastString
 type LlvmAlias = (LMString, LlvmType)
 
 -- | Llvm Types
-data LlvmType
+data LlvmType -- done
   = LMInt Int             -- ^ An integer with a given width in bits.
   | LMFloat               -- ^ 32 bit floating point
   | LMDouble              -- ^ 64 bit floating point
@@ -757,7 +757,7 @@ data LlvmCastOp
   | LM_Ptrtoint -- ^ Pointer to Integer
   | LM_Inttoptr -- ^ Integer to Pointer
   | LM_Bitcast  -- ^ Cast between types where no bit manipulation is needed
-  deriving (Eq)
+  deriving (Eq, Show)
 
 instance Outputable LlvmCastOp where
   ppr LM_Trunc    = text "trunc"

@@ -9,8 +9,9 @@ import Llvm.MetaData
 import Llvm.Types
 
 import LLVM.Core as LC
-import LLVM.Core.Util as LCUtil
+import LLVM.Core.Util as LCU
 import LLVM.Core.Instructions as LCI
+import LLVM.Core.Type as LCT
 import LLVM.FFI.Core as LFC
 import LLVM.Wrapper.Core as LWC
 
@@ -21,12 +22,12 @@ import Unique
 --------------------------------------------------------------------------------
 
 
-outputLlvmModule :: LlvmModule -> IO LCUtil.Module
-outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) =
-    
+outputLlvmModule :: LlvmModule -> IO LCU.Module
+outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) = undefined
 
-outputLlvmGlobal :: LMGlobal -> IO LCUtil.TGlobal a
-outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link sec ali con) dat) =
+outputLlvmGlobal :: LMGlobal -> IO LC.TGlobal a
+outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link sec ali con) dat) = 
+    createGlobal (con==Const) (llvmLinkageTypeToLinkage link) (llvmStaticToConstValue (fromJust dat))
 
 
 --------------------------------------------------------------------------------
@@ -34,16 +35,16 @@ outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link sec ali con) dat) =
 --------------------------------------------------------------------------------
 
 -- | Output out a whole LLVM module.
-outputLlvmModule :: LlvmModule -> IO LCUtil.Module
-outputLlvmModule (LlvmModule comments aliases meta globals decls funcs)
+outputLlvmModule :: LlvmModule -> IO LCU.Module
+outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) =  undefined
 
 -- | Output out a list of global mutable variable definitions
 outputLlvmGlobals :: [LMGlobal] -> 
-outputLlvmGlobals ls = 
+outputLlvmGlobals ls =  undefined
 
 -- | Output out a global mutable variable definition
-outputLlvmGlobal :: LMGlobal -> IO LCUtil.TGlobal a
-outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) =
+outputLlvmGlobal :: LMGlobal -> IO LCU.TGlobal a
+outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) = undefined
     
 
 outputLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
@@ -52,75 +53,75 @@ outputLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
 
 -- | Output out a list of LLVM type aliases.
 outputLlvmAliases :: [LlvmAlias] -> 
-outputLlvmAliases tys = 
+outputLlvmAliases tys =  undefined
 
 -- | Output out an LLVM type alias.
 -- Can't find this in the API
 outputLlvmAlias :: LlvmAlias -> 
-outputLlvmAlias (name, ty) = 
+outputLlvmAlias (name, ty) =  undefined
 
 
 -- | Output out a list of LLVM metadata.
 outputLlvmMetas :: [MetaDecl] -> 
-outputLlvmMetas metas = 
+outputLlvmMetas metas =  undefined
 
 -- | Output out an LLVM metadata definition
 outputLlvmMeta :: MetaDecl -> 
-outputLlvmMeta (MetaUnamed n m) =
+outputLlvmMeta (MetaUnamed n m) = undefined
 
 outputLlvmMeta (MetaNamed n m)
-  =
+  = undefined
 
 -- | Output out an LLVM metadata value.
 outputLlvmMetaExpr :: MetaExpr -> 
-outputLlvmMetaExpr (MetaStr    s ) = 
-outputLlvmMetaExpr (MetaNode   n ) = 
-outputLlvmMetaExpr (MetaVar    v ) = 
-outputLlvmMetaExpr (MetaStruct es) = 
+outputLlvmMetaExpr (MetaStr    s ) = undefined 
+outputLlvmMetaExpr (MetaNode   n ) = undefined 
+outputLlvmMetaExpr (MetaVar    v ) = undefined 
+outputLlvmMetaExpr (MetaStruct es) = undefined 
 
 
 -- | Output out a list of function definitions.
 outputLlvmFunctions :: LlvmFunctions -> 
-outputLlvmFunctions funcs = 
+outputLlvmFunctions funcs = undefined 
 
 -- | Output out a function definition.
 outputLlvmFunction :: LlvmFunction -> 
-outputLlvmFunction (LlvmFunction dec args attrs sec body) =
+outputLlvmFunction (LlvmFunction dec args attrs sec body) = undefined
     do
       f <- createFunction 
 
 -- | Output out a function defenition header.
 outputLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> 
 outputLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
-  = 
+  = undefined 
 
 -- | Output out a list of function declaration.
 outputLlvmFunctionDecls :: LlvmFunctionDecls -> 
-outputLlvmFunctionDecls decs = 
+outputLlvmFunctionDecls decs = undefined 
 
 -- | Output out a function declaration.
 -- Declarations define the function type but don't define the actual body of
 -- the function.
 outputLlvmFunctionDecl :: LlvmFunctionDecl -> 
 outputLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
-  = 
+  = undefined 
 
 -- | Output out a list of LLVM blocks.
 outputLlvmBlocks :: LlvmBlocks -> 
-outputLlvmBlocks blocks = 
+outputLlvmBlocks blocks = undefined 
 
 -- | Output out an LLVM block.
 -- It must be part of a function definition.
 outputLlvmBlock :: LlvmBlock -> 
-outputLlvmBlock (LlvmBlock blockId stmts) = 
+outputLlvmBlock (LlvmBlock blockId stmts) = undefined 
 
 -- | Output out an LLVM block label.
 outputLlvmBlockLabel :: LlvmBlockId -> 
-outputLlvmBlockLabel id = 
+outputLlvmBlockLabel id = undefined 
 
 -- | Output out an LLVM statement.
 outputLlvmStatement :: LlvmStatement -> 
-outputLlvmStatement stmt = 
+outputLlvmStatement stmt = undefined 
   case stmt of
     Assignment  dst expr      -> --ind $ ppAssignment dst expr
     Fence       st ord        -> --ind $ ppFence st ord
@@ -139,42 +140,42 @@ outputLlvmStatement stmt =
 -- | Output out an LLVM expression.
 outputLlvmExpression :: LlvmExpression -> 
 outputLlvmExpression expr
-  = 
+  = undefined 
 
 --------------------------------------------------------------------------------
 -- * Individual print functions
 --------------------------------------------------------------------------------
 
--- N.B. type Terminate = ()
+-- N.B. type Terminate = undefined ()
 
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
--- LFC.setTailCall if ct == TailCall
+-- LFC.setTailCall if ct = undefined= undefined TailCall
 outputCall :: LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> 
-outputCall ct fptr args attrs = 
+outputCall ct fptr args attrs = undefined 
 
 outputMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> 
-outputMachOp op left right = 
+outputMachOp op left right = undefined 
 
 outputCmpOp :: LlvmCmpOp -> LlvmVar -> LlvmVar -> 
-outputCmpOp op left right = 
+outputCmpOp op left right = undefined 
 
 -- check types here
 outputAssignment :: LlvmVar -> LlvmExpression -> 
-outputAssignment var expr = outputName var <+> equals <+> (ppLlvmExpression expr)
+outputAssignment var expr = undefined outputName var <+> equals <+> (ppLlvmExpression expr)
 
 -- Can't find a binding for this
 outputFence :: Bool -> LlvmSyncOrdering -> 
-outputFence st ord = 
+outputFence st ord = undefined 
 
 -- Nope, doesn't seem to be supported
 outputSyncOrdering :: LlvmSyncOrdering -> 
-outputSyncOrdering SyncUnord     = 
-outputSyncOrdering SyncMonotonic = 
-outputSyncOrdering SyncAcquire   = 
-outputSyncOrdering SyncRelease   = 
-outputSyncOrdering SyncAcqRel    = 
-outputSyncOrdering SyncSeqCst    = 
+outputSyncOrdering SyncUnord     = undefined 
+outputSyncOrdering SyncMonotonic = undefined 
+outputSyncOrdering SyncAcquire   = undefined 
+outputSyncOrdering SyncRelease   = undefined 
+outputSyncOrdering SyncAcqRel    = undefined 
+outputSyncOrdering SyncSeqCst    = undefined 
 
 -- XXX: On x86, vector types need to be 16-byte aligned for aligned access, but
 -- we have no way of guaranteeing that this is true with GHC (we would need to
@@ -186,7 +187,7 @@ outputSyncOrdering SyncSeqCst    =
 
 outputLoad :: LlvmVar -> 
 outputLoad var
-    -- n.b. no alignment data, should have alignment=1 byte
+    -- n.b. no alignment data, should have alignment= undefined1 byte
     | isVecPtrVar var = LCI.load (llvmVarToValue var)
     | otherwise       = LCI.load (llvmVarToValue var)
   where
@@ -203,7 +204,7 @@ outputStore val dst
 
 
 outputCast :: LlvmCastOp -> LlvmVar -> LlvmType -> 
-outputCast op from to = 
+outputCast op from to = undefined 
 
 -- mallocing in the LLVM API requires 
 outputMalloc :: LlvmType -> Int -> 
@@ -234,27 +235,27 @@ outputPhi tp preds = LCI.phi
 
 
 outputSwitch :: LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> 
-outputSwitch scrut dflt targets = 
+outputSwitch scrut dflt targets = undefined 
 
 outputAsm :: LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> 
 outputAsm asm constraints rty vars sideeffect alignstack = LCI.switch 
 
 -- Get a value from a vector
 outputExtract :: LlvmVar -> LlvmVar -> 
-outputExtract vec idx = 
+outputExtract vec idx = undefined 
 
 -- Insert a value into a vector
 outputInsert :: LlvmVar -> LlvmVar -> LlvmVar -> 
 outputInsert vec elt idx = LCI.insertElement vec elt idx
 
 outputMetaStatement :: [MetaAnnot] -> LlvmStatement -> 
-outputMetaStatement meta stmt = 
+outputMetaStatement meta stmt = undefined 
 
 outputMetaExpr :: [MetaAnnot] -> LlvmExpression -> 
-outputMetaExpr meta expr = 
+outputMetaExpr meta expr = undefined 
 
 outputMetaAnnots :: [MetaAnnot] -> 
-outputMetaAnnots meta = 
+outputMetaAnnots meta = undefined 
 
 --------------------------------------------------------------------------------
 -- * Misc functions
@@ -267,152 +268,3 @@ newLine = empty
 -- | Exclamation point.
 exclamation :: SDoc
 exclamation = char '!'
-
-llvmVarToValue :: LlvmVar -> LCU.Value
-llvmVarToValue var = 
-
-llvmVarToBasicBlock :: LlvmVar -> LCU.BasicBlock
-llvmVarToBasicBlock | (LMGlobalVar str ty link sec ali con) =
-                    | (LMLocalVar uniq ty) =
-                    | (LMNLocalVar str ty) =
-                    | (LMLitVar lit) =
-
-llvmTypeToType :: LlvmType -> IO LWC.Type
-llvmTypeToType ty =
-    case ty of
-    LMInt i -> LFC.integerType (CUInt i)
-    LMFloat -> LFC.floatType
-    LMDouble -> LFC.doubleType
-    LMFloat80 -> LFC.x86FP80Type
-    LMFloat128 -> LFC.fp128Type
-    LMPointer ty' -> LFC.pointerType (llvmTypeToType ty') {-addr space?-}
-    LMArray i ty' -> LFC.arrayType (llvmTypeToType ty') (CUInt i)
-    LMVector i ty' -> LFC.pointerType (llvmTypeToType ty') (CUInt i)
-    LMLabel -> LFC.labelType
-    LMVoid -> LFC.voidType
-    LMStruct [ty'] -> LFC.structType (llvmTypeToType ty') (CUInt {-?-}) (CInt 0) -- not packed
-    LMAlias ali -> {- got nothing -}
-    LMMetadata  -> {- got nothing -}
-
-llvmCallConventionToCallingConvention :: LlvmCallConvention -> LFC.CallingConvention
-llvmCallConventionToCallingConvention conv =
-    case conv of
-      CC_Ccc -> C
-      CC_Fastcc -> Fast
-      CC_Coldcc -> Cold
-      CC_Ncc code -> LFC.toCallingConvention code
-      CC_X86_Stdcc -> X86StdCall
-
-llvmLinkageTypeToLinkage :: LlvmLinkageType -> LFC.Linkage
-llvmLinkageTypeToLinkage link =
-    case link of
-         Internal -> ExternalLinkage
-         LinkOnce -> LinkOnceAnyLinkage -- LinkOnceODRLinkage has different semantics
-         Weak -> WeakAnyLinkage -- ditto WeakODRLinkage
-         Appending -> AppendingLinkage
-         ExternWeak -> ExternalWeakLinkage
-         ExternallyVisible -> ExternalLinkage -- default
-         External -> ExternalLinkage -- same as ExternallyVisible
-         Private -> PrivateLinkage
-
-llvmFuncAttrToAttribute :: LlvmFuncAttr -> LFC.Attribute
-llvmFuncAttrToAttribute attr =
-    case attr of
-      AlwaysInline -> AlwaysInlineAttribute
-      InlineHint -> InlineHintAttribute
-      NoInline -> NoInlineAttribute
-      OptSize -> OptimizeForSizeAttribute
-      NoReturn -> NoReturnAttribute
-      NoUnwind -> NoUnwindAttribute
-      ReadNone -> ReadNoneAttribute
-      ReadOnly -> ReadOnlyAttribute
-      Ssp -> StackProtectAttribute
-      SspReq -> StackProtectReqAttribute
-      NoRedZone -> NoRedZoneAttribute
-      NoImplicitFloat -> NoImplicitFloatAttribute
-      Naked -> NakedAttribute
-
--- FFI Attributes account for both function and parameter attributes
-llvmParamAttrTo :: LlvmParamAttr -> LFC.Attribute
-llvmParamAttrTo attr =
-    case attr of
-      ZeroExt -> ZExtAttribute
-      SignExt -> SExtAttribute
-      InReg -> InRegAttribute
-      ByVal -> ByValAttribute
-      SRet -> StructRetAttribute
-      NoAlias -> NoAliasAttribute
-      NoCapture -> NoCaptureAttribute
-      Nest -> NestAttribute
-
--- these are all binops, types should but are not constrained
-llvmMachOpToCodeGenFunction :: LlvmMachOp -> (a -> b -> CodeGenFunction r (v c))
-llvmMachOpToCodeGenFunction op =
-    case op of
-      LM_MO_Add  -> LCI.add
-      LM_MO_Sub  -> LCI.sub
-      LM_MO_Mul  -> LCI.mul
-      LM_MO_UDiv -> LCI.idiv -- udiv is deprecated
-      LM_MO_SDiv -> LCI.idiv -- sdiv is deprecated
-      LM_MO_URem -> LCI.irem -- urem is deprecated
-      LM_MO_SRem -> LCI.irem -- srem is deprecated
-      LM_MO_FAdd -> LCI.fadd
-      LM_MO_FSub -> LCI.fsub
-      LM_MO_FMul -> LCI.fmul
-      LM_MO_FDiv -> LCI.fdiv
-      LM_MO_FRem -> LCI.frem
-      LM_MO_Shl  -> LCI.shl
-      LM_MO_LShr -> LCI.lshr
-      LM_MO_AShr -> LCI.ashr
-      LM_MO_And  -> LCI.and
-      LM_MO_Or   -> LCI.or
-      LM_MO_Xor  -> LCI.xor
-
--- Convert comparator operators to integer predicates
-llvmCmpOpToIntPredicate :: LlvmCmpOp -> LCI.IntPredicate
-llvmCmpOpToIntPredicate op =
-    case op of
-      LM_CMP_Eq  -> IntEQ
-      LM_CMP_Ne  -> IntNE
-      LM_CMP_Ugt -> IntUGT
-      LM_CMP_Uge -> IntUGE
-      LM_CMP_Ult -> IntULT
-      LM_CMP_Ule -> IntULE
-      LM_CMP_Sgt -> IntSGT
-      LM_CMP_Sge -> IntSGE
-      LM_CMP_Slt -> IntSLT
-      LM_CMP_Sle -> IntSLE
-      _          -> error $ (show op) ++ " is not an integer comparator."
-
--- Convert comparator operators to floating point predicates
-llvmCmpOpToFPPredicate :: LlvmCmpOp -> LCI.FPPredicate
-llvmCmpOpToFPPredicate op =
-    case op of
-      LM_CMP_Feq -> FPOEQ
-      LM_CMP_Fne -> FPONE
-      LM_CMP_Fgt -> FPOGT
-      LM_CMP_Fge -> FPOGE
-      LM_CMP_Flt -> FPOLT
-      LM_CMP_Fle -> FPOLE
-      _          -> error $ (show op) ++ " is not an floating point comparator."
-
-
--- LlvmCastOp conversions
-llvmCastOpToCast :: LlvmCastOp -> (LWC.Builder -> LWC.Value -> LWC.Type -> LWC.String -> IO LWC.Value)
-llvmCastOpToCast op =
-    case op of
-      LM_Trunc    -> LWC.buildTrunc
-      LM_Zext     -> LWC.buildZExt
-      LM_Sext     -> LWC.buildSExt
-      LM_Fptrunc  -> LWC.buildFPTrunc
-      LM_Fpext    -> LWC.buildFPExt
-      LM_Fptoui   -> LWC.buildFPToUI
-      LM_Fptosi   -> LWC.buildFPToSI
-      LM_Uitofp   -> LWC.buildUIToFP
-      LM_Sitofp   -> LWC.buildSItoFP
-      LM_Ptrtoint -> LWC.buildPtrToInt
-      LM_Inttoptr -> LWC.buildIntToPtr
-      LM_Bitcast  -> LWC.buildBitCast
-
--- LlvmStatic (global variables and constants) conversion
-llvmStaticTo
