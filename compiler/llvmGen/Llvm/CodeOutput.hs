@@ -119,28 +119,44 @@ outputLlvmBlock (LlvmBlock blockId stmts) = undefined
 outputLlvmBlockLabel :: LlvmBlockId -> 
 outputLlvmBlockLabel id = undefined 
 
--- | Output out an LLVM statement.
+-- | Output out an LLVM statement. The types here may not match up.
 outputLlvmStatement :: LlvmStatement -> 
-outputLlvmStatement stmt = undefined 
+outputLlvmStatement stmt = 
   case stmt of
-    Assignment  dst expr      -> --ind $ ppAssignment dst expr
-    Fence       st ord        -> --ind $ ppFence st ord
-    Branch      target        -> --ind $ ppBranch target
-    BranchIf    cond ifT ifF  -> --ind $ ppBranchIf cond ifT ifF
-    Comment     comments      -> --ind $ ppLlvmComments comments
-    MkLabel     label         -> --ppLlvmBlockLabel label
-    Store       value ptr     -> --ind $ ppStore value ptr
-    Switch      scrut def tgs -> --ind $ ppSwitch scrut def tgs
-    Return      result        -> --ind $ ppReturn result
-    Expr        expr          -> --ind $ ppLlvmExpression expr
-    Unreachable               -> --ind $ text "unreachable"
-    Nop                       -> --empty
-    MetaStmt    meta s        -> --ppMetaStatement meta s
+    Assignment  dst expr      -> outputAssignment dst expr
+    Fence       st ord        -> outputFence st ord
+    Branch      target        -> outputBranch target
+    BranchIf    cond ifT ifF  -> outputBranchIf cond ifT ifF
+    Comment     comments      -> outputLlvmComments comments
+    MkLabel     label         -> outputLlvmBlockLabel label
+    Store       value ptr     -> outputStore value ptr
+    Switch      scrut def tgs -> outputSwitch scrut def tgs
+    Return      result        -> outputReturn result
+    Expr        expr          -> outputLlvmExpression expr
+    Unreachable               -> LCI.unreachable
+    Nop                       -> 
+    MetaStmt    meta s        -> outputMetaStatement meta s
 
--- | Output out an LLVM expression.
+-- | Output out an LLVM expression. Same potential problem with the types here,
+-- need to work out what types will be. Probably CodeGenFunction.
 outputLlvmExpression :: LlvmExpression -> 
 outputLlvmExpression expr
-  = undefined 
+  = case expr of
+      Alloca     tp amount        -> outputAlloca tp amount
+      LlvmOp     op left right    -> outputMachOp op left right
+      Call       tp fp args attrs -> outputCall tp fp (map MetaVar args) attrs
+      CallM      tp fp args attrs -> outputCall tp fp args attrs
+      Cast       op from to       -> outputCast op from to
+      Compare    op left right    -> outputCmpOp op left right
+      Extract    vec idx          -> outputExtract vec idx
+      Insert     vec elt idx      -> outputInsert vec elt idx
+      GetElemPtr inb ptr indexes  -> outputGetElementPtr inb ptr indexes
+      Load       ptr              -> outputLoad ptr
+      Malloc     tp amount        -> outputMalloc tp amount
+      Phi        tp precessors    -> outputPhi tp precessors
+      Asm        asm c ty v se sk -> outputAsm asm c ty v se sk
+      MExpr      meta expr        -> outputMetaExpr meta expr
+
 
 --------------------------------------------------------------------------------
 -- * Individual print functions
@@ -150,25 +166,27 @@ outputLlvmExpression expr
 
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
--- LFC.setTailCall if ct = undefined= undefined TailCall
+-- LFC.setTailCall if ct = TailCall
+-- Ignore tail calls for now, the optimizer /should/ take care of them.
 outputCall :: LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> 
-outputCall ct fptr args attrs = undefined 
+outputCall ct fptr args attrs = undefined -- doCallDef 
 
 outputMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> 
-outputMachOp op left right = undefined 
+outputMachOp op left right = op' (llvmVarToValue left) (llvmVarToValue right)
+    where op' = llvmMachOpToCodeGenFunction op
 
 outputCmpOp :: LlvmCmpOp -> LlvmVar -> LlvmVar -> 
-outputCmpOp op left right = undefined 
+outputCmpOp op left right = llvmCmpOpToIntPredicate op
 
--- check types here
+-- check types here, can't find assignment op
 outputAssignment :: LlvmVar -> LlvmExpression -> 
-outputAssignment var expr = undefined outputName var <+> equals <+> (ppLlvmExpression expr)
+outputAssignment var expr = undefined
 
 -- Can't find a binding for this
 outputFence :: Bool -> LlvmSyncOrdering -> 
 outputFence st ord = undefined 
 
--- Nope, doesn't seem to be supported
+-- Or for this
 outputSyncOrdering :: LlvmSyncOrdering -> 
 outputSyncOrdering SyncUnord     = undefined 
 outputSyncOrdering SyncMonotonic = undefined 
@@ -203,50 +221,57 @@ outputStore val dst
     isVecPtrVar = isVector . pLower . getVarType
 
 
-outputCast :: LlvmCastOp -> LlvmVar -> LlvmType -> 
-outputCast op from to = undefined 
+outputCast :: LlvmCastOp -> LlvmVar -> LlvmType -> LCI.InstrDesc
+outputCast op var ty = llvmCastOpToInstrDesc op ty var
 
 -- mallocing in the LLVM API requires 
 outputMalloc :: LlvmType -> Int -> 
 outputMalloc tp amount = LCI.arrayMalloc ((llvmTypeToType tp)::amount)
 
 outputAlloca :: LlvmType -> Int -> 
-outputAlloca tp amount = 
+outputAlloca tp amount = LCI.alloca -- ...
 
 outputGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> 
-outputGetElementPtr inb ptr idx = 
+outputGetElementPtr inb ptr idx = undefined
 
 outputReturn :: Maybe LlvmVar -> 
-outputReturn (Just var) = LCI.ret (outputVar var)
+outputReturn (Just var) = LCI.ret (llvmVarToValue var)
 outputReturn Nothing    = LCI.ret ()
 
 -- Unconditional branch to target
 outputBranch :: LlvmVar -> CodeGenFunction r Terminate
-outputBranch var = LCI.br (outputVar var)
+outputBranch var = LCI.br (llvmVarToBasicBlock var)
 
 
 outputBranchIf :: LlvmVar -> LlvmVar -> LlvmVar -> CodeGenFunction r Terminate
 outputBranchIf cond trueT falseT
-  = LCI.condBr (llvmVarToBool cond) (outputVar trueT) (outputVar falseT)
+  = LCI.condBr (llvmVarToBool cond) (llvmVarToBasicBlock trueT) (llvmVarToBasicBlock falseT)
 
 
 outputPhi :: LlvmType -> [(LlvmVar,LlvmVar)] -> 
-outputPhi tp preds = LCI.phi 
+outputPhi tp preds = LCI.phi -- ...
 
 
 outputSwitch :: LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> 
-outputSwitch scrut dflt targets = undefined 
+outputSwitch scrut dflt targets = LCI.switch (llvmVarToValue scrut) 
+                                    (llvmVarToBasicBlock dflt) 
+                                    (map convertTarget targets)
+    where convertTarget = (\(con, target) -> (llvmVarToConst con, llvmVarToBasicBlock target))
 
+
+-- Look to LFC.constInlineAsm for this, no high level bindings
 outputAsm :: LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> 
-outputAsm asm constraints rty vars sideeffect alignstack = LCI.switch 
+outputAsm asm constraints rty vars sideeffect alignstack = undefined
 
 -- Get a value from a vector
 outputExtract :: LlvmVar -> LlvmVar -> 
-outputExtract vec idx = undefined 
+outputExtract vec idx = 
+    LCI.extractelement (llvmVarToValue vec) (llvmVarToValue idx)
 
 -- Insert a value into a vector
 outputInsert :: LlvmVar -> LlvmVar -> LlvmVar -> 
-outputInsert vec elt idx = LCI.insertElement vec elt idx
+outputInsert vec elt idx = 
+    LCI.insertElement (llvmVarToValue vec) (llvmVarToValue elt) (llvmVarToValue idx)
 
 outputMetaStatement :: [MetaAnnot] -> LlvmStatement -> 
 outputMetaStatement meta stmt = undefined 
@@ -256,15 +281,3 @@ outputMetaExpr meta expr = undefined
 
 outputMetaAnnots :: [MetaAnnot] -> 
 outputMetaAnnots meta = undefined 
-
---------------------------------------------------------------------------------
--- * Misc functions
---------------------------------------------------------------------------------
-
--- | Blank line.
-newLine :: SDoc
-newLine = empty
-
--- | Exclamation point.
-exclamation :: SDoc
-exclamation = char '!'

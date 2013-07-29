@@ -18,13 +18,16 @@ import LLVM.Wrapper.Core as LWC
 import Unique
 
 llvmVarToValue :: LlvmVar -> LCU.Value
-llvmVarToValue var = undefined 
+llvmVarToValue  | (LMGlobalVar str ty link sec ali con) = undefined
+                | (LMLocalVar uniq ty) = undefined
+                | (LMNLocalVar str ty) = undefined
+                | (LMLitVar lit) = undefined
 
 llvmVarToBasicBlock :: LlvmVar -> LCU.BasicBlock
-llvmVarToBasicBlock | (LMGlobalVar str ty link sec ali con) =
-                    | (LMLocalVar uniq ty) =
-                    | (LMNLocalVar str ty) =
-                    | (LMLitVar lit) =
+llvmVarToBasicBlock | (LMGlobalVar str ty link sec ali con) = undefined
+                    | (LMLocalVar uniq ty) = undefined
+                    | (LMNLocalVar str ty) = undefined
+                    | (LMLitVar lit) = undefined
 
 llvmTypeToTypeDesc :: LlvmType -> LCT.TypeDesc
 llvmTypeToTypeDesc ty =
@@ -150,8 +153,8 @@ llvmCmpOpToFPPredicate op =
 
 -- LlvmCastOp conversions
 -- Higher level llvm bindings only expose bitcasts, why is this?
-llvmCastOpToInstrDesc :: LlvmCastOp -> LlvmType -> LlvmType -> LlvmVar -> LCI.InstrDesc
-llvmCastOpToInstrDesc op tyFrom tyTo arg =
+llvmCastOpToInstrDesc :: LlvmCastOp -> LlvmType -> LlvmVar -> LCI.InstrDesc
+llvmCastOpToInstrDesc op tyTo arg@(LMGlobalVar _ tyFrom _ _ _ _) =
     (case op of
       LM_Trunc    -> IDTrunc
       LM_Zext     -> LWC.buildZExt
@@ -166,7 +169,6 @@ llvmCastOpToInstrDesc op tyFrom tyTo arg =
       LM_Inttoptr -> LWC.buildIntToPtr
       LM_Bitcast  -> LWC.buildBitCast)
              $ (llvmTypeToTypeDesc tyFrom) (llvmTypeToTypeDesc tyTo) (llvmVarToArgDesc arg)
-
 
 -- this might not be a thing
 llvmVarToArgDesc :: LlvmVar -> LCI.ArgDesc
@@ -187,4 +189,5 @@ llvmVarToArgDesc var =
 --llvmStaticTo
 
 
-llvmStaticToConstValue :: LlvmStatic -> LC
+--llvmStaticToConstValue :: LlvmStatic -> LC
+
