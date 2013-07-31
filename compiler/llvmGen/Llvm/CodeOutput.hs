@@ -18,19 +18,6 @@ import LLVM.Wrapper.Core as LWC
 import Unique
 
 --------------------------------------------------------------------------------
--- * Top Level Code Output functions
---------------------------------------------------------------------------------
-
-
-outputLlvmModule :: LlvmModule -> IO LCU.Module
-outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) = undefined
-
-outputLlvmGlobal :: LMGlobal -> IO LC.TGlobal a
-outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link sec ali con) dat) = 
-    createGlobal (con==Const) (llvmLinkageTypeToLinkage link) (llvmStaticToConstValue (fromJust dat))
-
-
---------------------------------------------------------------------------------
 -- * Top Level Output functions
 --------------------------------------------------------------------------------
 
@@ -39,13 +26,13 @@ outputLlvmModule :: LlvmModule -> IO LCU.Module
 outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) =  undefined
 
 -- | Output out a list of global mutable variable definitions
-outputLlvmGlobals :: [LMGlobal] -> 
-outputLlvmGlobals ls =  undefined
+outputLlvmGlobals :: [LMGlobal] -> IO ()
+outputLlvmGlobals ls = mapM_ outputLlvmGlobal ls
 
 -- | Output out a global mutable variable definition
-outputLlvmGlobal :: LMGlobal -> IO LCU.TGlobal a
-outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) = undefined
-    
+outputLlvmGlobal :: LMGlobal -> IO (LCU.TGlobal a)
+outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) = do
+  createNamedGlobal (c==Constant) (llvmLinkageTypeToLinkage link) name (llvmStaticToConstValue (fromJust dat))
 
 outputLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
   error $ "Non Global var outputr as global! "
@@ -53,7 +40,7 @@ outputLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
 
 -- | Output out a list of LLVM type aliases.
 outputLlvmAliases :: [LlvmAlias] -> 
-outputLlvmAliases tys =  undefined
+outputLlvmAliases alis =  mapM_ outputLlvmAlias alis
 
 -- | Output out an LLVM type alias.
 -- Can't find this in the API
@@ -86,9 +73,10 @@ outputLlvmFunctions funcs = undefined
 
 -- | Output out a function definition.
 outputLlvmFunction :: LlvmFunction -> 
-outputLlvmFunction (LlvmFunction dec args attrs sec body) = undefined
+outputLlvmFunction (LlvmFunction dec@(LLVMFunctionDecl name link cc retTy vArgs params ali) 
+                                 args attrs sec body) =
     do
-      f <- createFunction 
+      f <- createNamedFunction (llvmLinkageToLinkage link) (unPackFS name) {-body-}
 
 -- | Output out a function defenition header.
 outputLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> 
@@ -113,7 +101,7 @@ outputLlvmBlocks blocks = undefined
 -- | Output out an LLVM block.
 -- It must be part of a function definition.
 outputLlvmBlock :: LlvmBlock -> 
-outputLlvmBlock (LlvmBlock blockId stmts) = undefined 
+outputLlvmBlock (LlvmBlock blockId stmts) = 
 
 -- | Output out an LLVM block label.
 outputLlvmBlockLabel :: LlvmBlockId -> 
@@ -134,7 +122,7 @@ outputLlvmStatement stmt =
     Return      result        -> outputReturn result
     Expr        expr          -> outputLlvmExpression expr
     Unreachable               -> LCI.unreachable
-    Nop                       -> 
+    Nop                       -> undefined
     MetaStmt    meta s        -> outputMetaStatement meta s
 
 -- | Output out an LLVM expression. Same potential problem with the types here,
@@ -162,7 +150,7 @@ outputLlvmExpression expr
 -- * Individual print functions
 --------------------------------------------------------------------------------
 
--- N.B. type Terminate = undefined ()
+-- N.B. type Terminate = ()
 
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.

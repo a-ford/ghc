@@ -18,16 +18,28 @@ import LLVM.Wrapper.Core as LWC
 import Unique
 
 llvmVarToValue :: LlvmVar -> LCU.Value
-llvmVarToValue  | (LMGlobalVar str ty link sec ali con) = undefined
+llvmVarToValue  | (LMGlobalVar str ty link sec ali con) =
+                    if con == Constant then LC.valueOf 
+{-                    case type of
+                      LMInt width        ->             -- ^ An integer with a given width in bits.
+                      LMFloat            ->          -- ^ 32 bit floating point
+                      LMDouble           ->          -- ^ 64 bit floating point
+                      LMFloat80          ->          -- ^ 80 bit (x86 only) floating point
+                      LMFloat128         ->          -- ^ 128 bit floating point
+                      LMPointer ty       ->   -- ^ A pointer to a 'LlvmType'
+                      LMArray size ty    ->  -- ^ An array of 'LlvmType'
+                      LMVector size ty   -> -- ^ A vector of 'LlvmType'
+                      LMLabel            ->     -- ^ A 'LlvmVar' can represent a label (address)
+                      LMVoid             ->     -- ^ Void type
+                      LMStruct tys       ->   -- ^ Structure type
+                      LMAlias (name, ty) ->     -- ^ A type alias
+                      LMMetadata         ->           -- ^ LLVM Metadata
+                      LMFunction decl    ->
+-}
+
                 | (LMLocalVar uniq ty) = undefined
                 | (LMNLocalVar str ty) = undefined
                 | (LMLitVar lit) = undefined
-
-llvmVarToBasicBlock :: LlvmVar -> LCU.BasicBlock
-llvmVarToBasicBlock | (LMGlobalVar str ty link sec ali con) = undefined
-                    | (LMLocalVar uniq ty) = undefined
-                    | (LMNLocalVar str ty) = undefined
-                    | (LMLitVar lit) = undefined
 
 llvmTypeToTypeDesc :: LlvmType -> LCT.TypeDesc
 llvmTypeToTypeDesc ty =
@@ -186,8 +198,48 @@ llvmVarToArgDesc var =
 
 
 -- LlvmStatic (global variables and constants) conversion
---llvmStaticTo
+llvmStaticToConstValue :: LlvmStatic -> LC.ConstValue
+llvmStaticToConstValue | LMComment str = constOf str
+                       | LMStaticLit lit = case lit of
+                                             LMIntLit i width -> constOf $ intToIntN i width
+                                             LMFloatLit d ty  -> constOf $ floatToFloatN d ty
+                                             LMNullLit ty     -> (LC.zero :: (llvmTypeToType ty0))
+                                             LMVectorLit lits -> constOf $ vector (map llvmStaticToConstValue lits)
+                                             LMUndefLit       -> LC.undef
+                       -- TODO
+                       | LMUninitType ty = error "llvmStaticToConstValue: No uninitialised consts."
+                       | LMStaticStr str ty = error "Constant strings are broken in the bindings."
+                       | LMStaticArray stats ty = undefined
+                       | LMStaticStruc stats ty = undefined
+                       | LMStaticPointer var = undefined
+                       -- static expressions
+                       | LMBitc stat ty = undefined
+                       | LMPtoI stat ty = undefined
+                       | LMAdd statL statR = undefined
+                       | LMSub statL statR = undefined
 
+-- Convert Ints to (signed) Ints of a certain width
+intToIntN :: Integral a => Int -> Int -> a
+intToIntN i width = case width of
+                      8  -> Int8 i
+                      16 -> Int16 i
+                      32 -> Int32 i
+                      64 -> Int64 i
+                      _  -> error $ "intToIntN: " ++ (show width) ++
+                               " is not a valid integer width"
 
---llvmStaticToConstValue :: LlvmStatic -> LC
+floatToFloatN :: Floating a :: Double -> LlvmType -> a
+floatToFloatN d ty = case type of
+                       LMFloat    -> (d :: Float)
+                       LMDouble   -> (d :: Double)
+                       LMFloat80  -> (d :: Double) -- We don't have appropriate
+                       LMFloat128 -> (d :: Double) -- built in types for these
+                       _          -> error $ "floatToFloatN: " ++ (show ty) ++
+                                     "is not an appropriate float type"
 
+basicLit :: LlvmLit -> a
+basicLit | LMIntLit i width = intToIntN i width
+         | LMFloatLit d ty  = floatToFloatN d ty
+         | LMNullLit ty     = error "basicLit: nulls unsupported"
+         | LMVectorLit lits = vector (map basicLit lits)
+         | LMUndefLit       = error "basicLit: undefs unsupported"

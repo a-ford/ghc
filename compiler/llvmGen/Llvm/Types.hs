@@ -41,7 +41,7 @@ type LMString = FastString
 type LlvmAlias = (LMString, LlvmType)
 
 -- | Llvm Types
-data LlvmType -- done
+data LlvmType
   = LMInt Int             -- ^ An integer with a given width in bits.
   | LMFloat               -- ^ 32 bit floating point
   | LMDouble              -- ^ 64 bit floating point
