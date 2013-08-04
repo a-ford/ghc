@@ -33,6 +33,13 @@ import Data.IORef ( writeIORef )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
+import LLVM.Core as LC
+import LLVM.Core.Util as LCU
+import LLVM.Core.Instructions as LCI
+import LLVM.Core.Type as LCT
+import LLVM.FFI.Core as LFC
+import LLVM.Wrapper.Core as LWC
+
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
@@ -64,15 +71,20 @@ llvmCodeGen dflags h us cmm_stream
 
        -- run code generation
        runLlvm dflags ver bufh us $
-         llvmCodeGen' (liftStream cmm_stream)
+         llvmCodeGen' (targetPlatform dflags) (liftStream cmm_stream)
 
        bFlush bufh
 
-llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
-llvmCodeGen' cmm_stream
+llvmCodeGen' :: Platform -> Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
+llvmCodeGen' platform cmm_stream
   = do  -- Preamble
-        renderLlvm pprLlvmHeader
-        ghcInternalFunctions
+        m   <- newModule
+        dl  <- newCString (platformToDataLayoutString platform)
+        tgt <- newCString (platformToTargetString platform)
+        LFC.setDataLayout m dl
+        LFC.setTarget m tgt
+{-        renderLlvm pprLlvmHeader -
+        ghcInternalFunctions 
         cmmMetaLlvmPrelude
 
         -- Procedures
@@ -84,6 +96,7 @@ llvmCodeGen' cmm_stream
 
         -- Postamble
         cmmUsedLlvmGens
+-}
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do
@@ -194,3 +207,52 @@ cmmUsedLlvmGens = do
   if null ivars
      then return ()
      else renderLlvm $ pprLlvmData ([lmUsed], [])
+
+-- Converts a platform to strings representing the data layout and target OS+Arch
+platformToDataLayoutString :: Platform -> String
+platformToDataLayoutString platform =
+    case platform of
+      Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
+          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32"
+      Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
+          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32"
+      Platform { platformArch = ArchX86, platformOS = OSLinux } ->
+                  "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32"
+      Platform { platformArch = ArchX86_64, platformOS = OSDarwin } ->
+                  "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
+      Platform { platformArch = ArchX86_64, platformOS = OSLinux } ->
+                  "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
+      Platform { platformArch = ArchARM {}, platformOS = OSLinux } ->
+                  "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32"
+      Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
+                  "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32"
+      Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
+                  "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32"
+      Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
+                  "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32"
+      _ ->
+          ""
+
+platformToTargetString :: Platform -> String
+platformToTargetString platform =
+    case platform of
+      Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
+          "i386-apple-darwin9.8"
+      Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
+          "i686-pc-win32"
+      Platform { platformArch = ArchX86, platformOS = OSLinux } ->
+          "i386-pc-linux-gnu"
+      Platform { platformArch = ArchX86_64, platformOS = OSDarwin } ->
+          "x86_64-apple-darwin10.0.0"
+      Platform { platformArch = ArchX86_64, platformOS = OSLinux } ->
+          "x86_64-linux-gnu"
+      Platform { platformArch = ArchARM {}, platformOS = OSLinux } ->
+          "arm-unknown-linux-gnueabi"
+      Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
+          "arm-unknown-linux-androideabi"
+      Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
+          "arm-unknown-nto-qnx8.0.0eabi"
+      Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
+          "arm-apple-darwin10"
+      _ ->
+          ""

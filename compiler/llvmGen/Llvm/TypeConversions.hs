@@ -9,7 +9,7 @@ import Llvm.MetaData
 import Llvm.Types
 
 import LLVM.Core as LC
-import LLVM.Core.Util as LCUtil
+import LLVM.Core.Util as LCU
 import LLVM.Core.Instructions as LCI
 import LLVM.Core.Type as LCT
 import LLVM.FFI.Core as LFC
@@ -17,10 +17,10 @@ import LLVM.Wrapper.Core as LWC
 
 import Unique
 
-llvmVarToValue :: LlvmVar -> LCU.Value
+llvmVarToValue :: LlvmVar -> LCU.Value a
 llvmVarToValue  | (LMGlobalVar str ty link sec ali con) =
                     if con == Constant then LC.valueOf 
-{-                    case type of
+                    case type of
                       LMInt width        ->             -- ^ An integer with a given width in bits.
                       LMFloat            ->          -- ^ 32 bit floating point
                       LMDouble           ->          -- ^ 64 bit floating point
@@ -35,8 +35,6 @@ llvmVarToValue  | (LMGlobalVar str ty link sec ali con) =
                       LMAlias (name, ty) ->     -- ^ A type alias
                       LMMetadata         ->           -- ^ LLVM Metadata
                       LMFunction decl    ->
--}
-
                 | (LMLocalVar uniq ty) = undefined
                 | (LMNLocalVar str ty) = undefined
                 | (LMLitVar lit) = undefined
@@ -243,3 +241,11 @@ basicLit | LMIntLit i width = intToIntN i width
          | LMNullLit ty     = error "basicLit: nulls unsupported"
          | LMVectorLit lits = vector (map basicLit lits)
          | LMUndefLit       = error "basicLit: undefs unsupported"
+
+llvmVarToFunction :: LlvmVar -> LC.Function a
+llvmVarToFunction | LMGlobalVar name ty link sec ali con = 
+                  | LMLocalVar uniq ty = 
+                  | LMNLocalVar name ty = 
+                  | LMLitVar lit = undefined
+
+metaExprTo
