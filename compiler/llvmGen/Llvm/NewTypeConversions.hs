@@ -27,9 +27,9 @@ llvmLinkageTypeToLinkage link =
       Private -> Private
 
 llvmVarToGlobal :: LlvmVar -> Global
-llvmVarToGlobal | (LMGlobalVar str ty link sec ali con) =
+llvmVarToGlobal (LMGlobalVar str ty link sec ali con) =
                     GlobalVariable {
-                    name = (Name (unpackFS str)),
+                    name = mkName str,
                     linkage = (llvmLinkageTypeToLinkage link)
                     visibility = Default,
                     isThreadLocal = False,
@@ -41,9 +41,9 @@ llvmVarToGlobal | (LMGlobalVar str ty link sec ali con) =
                     section = sec >>= (Just . unpackFS),
                     alignment = if ali==Nothing then 0 else fromJust ali
                   }
-                | (LMLocalVar uniq ty) = undefined
-                | (LMNLocalVar str ty) = undefined
-                | (LMLitVar lit) = undefined
+llvmVarToGlobal (LMLocalVar uniq ty) = undefined
+llvmVarToGlobal (LMNLocalVar str ty) = undefined
+llvmVarToGlobal (LMLitVar lit) = undefined
 
 
 floatToSomeFloat :: Double -> LlvmType -> SomeFloat
@@ -56,41 +56,44 @@ floatToSomeFloat d ty =
       _          -> error (show ty) ++ " is not an floating type."
 
 llvmTypeToType :: LlvmType -> Type
-llvmTypeToType
-    | LMInt width = IntegerType width
-    | LMFloat = FloatingPointType 32 IEEE
-    | LMDouble = FloatingPointType 64 IEEE
-    | LMFloat80 = FloatingPointType 80 DoubleExtended
-    | LMFloat128 = FloatingPointType 128 IEEE
-    | LMPointer ty = PointerType (llvmTypeToType ty) (AddrSpace 0) -- don't know about address space
-    | LMArray len ty = ArrayType len (llvmTypeToType ty)
-    | LMVector len typ = VectorType len (llvmTypeToType ty)
-    | LMLabel = undefined
-    | LMVoid = VoidType
-    | LMStruct tys = StructureType false (map llvmTypeToType tys) -- not packed
-    | LMAlias ali = NamedTypeReference
-    | LMMetadata = MetaDataType
-    | LMFunction decl@(name link cc ty vArgs params ali) = FunctionType (llvmTypeToType ty) (map (llvmTypeToType . fst) params) (vArgs == VarArgs)
+llvmTypeToType ty =
+    case ty of
+      LMInt width -> IntegerType width
+      LMFloat -> FloatingPointType 32 IEEE
+      LMDouble -> FloatingPointType 64 IEEE
+      LMFloat80 -> FloatingPointType 80 DoubleExtended
+      LMFloat128 -> FloatingPointType 128 IEEE
+      LMPointer ty -> PointerType (llvmTypeToType ty) (AddrSpace 0) -- don't know about address space
+      LMArray len ty -> ArrayType len (llvmTypeToType ty)
+      LMVector len typ -> VectorType len (llvmTypeToType ty)
+      LMLabel -> undefined
+      LMVoid -> VoidType
+      LMStruct tys -> StructureType false (map llvmTypeToType tys) -- not packed
+      LMAlias ali -> NamedTypeReference
+      LMMetadata -> MetaDataType
+      LMFunction decl@(name link cc ty vArgs params ali) -> FunctionType (llvmTypeToType ty) (map (llvmTypeToType . fst) params) (vArgs == VarArgs)
 
 llvmStaticToConstant :: LlvmStatic -> Constant
-llvmStaticToConstant | LMComment str = undefined
-                     | LMStaticLit lit = 
-                         case lit of
-                           LMIntLit i width -> Int width i
-                           LMFloatLit d ty  -> Float (floatToSomeFloat d ty)
-                           LMNullLit ty     -> Null (llvmTypeToType ty)
-                           LMVectorLit lits -> Vector (map (llvmStaticToConstant . LlvmStaticLit) lits)
-                           LMUndefLit       -> Undef VoidType
-                       | LMUninitType ty = Undef (llvmTypeToType ty)
-                       | LMStaticStr str ty = 
-                       | LMStaticArray stats ty = Array (llvmTypeToType ty) (map llvmStaticToConstant stats)
-                       | LMStaticStruc stats ty = Vector (map llvmStaticToConstant stats)
-                       | LMStaticPointer var = undefined
-                       -- static expressions
-                       | LMBitc stat ty = BitCast (llvmStaticToConstant stat) (llvmTypeToType ty)
-                       | LMPtoI stat ty = IntToPtr (llvmStaticToConstant stat) (llvmTypeToType ty)
-                       | LMAdd statL statR = Add False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
-                       | LMSub statL statR = Sub False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
+llvmStaticToConstant stat =
+    case stat of
+      LMComment str -> undefined
+      LMStaticLit lit -> 
+          case lit of
+            LMIntLit i width -> Int width i
+            LMFloatLit d ty  -> Float (floatToSomeFloat d ty)
+            LMNullLit ty     -> Null (llvmTypeToType ty)
+            LMVectorLit lits -> Vector (map (llvmStaticToConstant . LlvmStaticLit) lits)
+            LMUndefLit       -> Undef VoidType
+      LMUninitType ty -> Undef (llvmTypeToType ty)
+      LMStaticStr str ty -> 
+      LMStaticArray stats ty -> Array (llvmTypeToType ty) (map llvmStaticToConstant stats)
+      LMStaticStruc stats ty -> Vector (map llvmStaticToConstant stats)
+      LMStaticPointer var -> undefined
+      -- static expressions
+      LMBitc stat ty -> BitCast (llvmStaticToConstant stat) (llvmTypeToType ty)
+      LMPtoI stat ty -> IntToPtr (llvmStaticToConstant stat) (llvmTypeToType ty)
+      LMAdd statL statR -> Add False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
+      LMSub statL statR -> Sub False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
 
 llvmCallConventionToCallingConvention :: LlvmCallConvention -> CallingConvention
 llvmCallConventionToCallingConvention conv =
@@ -132,8 +135,8 @@ llvmParamAttrToParameterAttribute attr =
       Nest -> Nest
 
 -- Convert comparator operators to integer predicates
-llvmCmpOpToIntPredicate :: LlvmCmpOp -> IntegerPredicate
-llvmCmpOpToIntPredicate op =
+llvmCmpOpToIntegerPredicate :: LlvmCmpOp -> IntegerPredicate
+llvmCmpOpToIntegerPredicate op =
     case op of
       LM_CMP_Eq  -> EQ
       LM_CMP_Ne  -> NE
@@ -161,28 +164,226 @@ llvmCmpOpToFloatingPointPredicate op =
       _          -> error $ (show op) ++ " is not an floating point comparator."
 
 
--- LlvmCastOp conversions
-llvmCastOpToInstruction :: LlvmCastOp -> LlvmType -> LlvmVar -> Instruction
-llvmCastOpToInstruction op tyTo arg@(LMGlobalVar _ tyFrom _ _ _ _) =
-    (case op of
-      LM_Trunc    -> Trunc
-      LM_Zext     -> ZExt
-      LM_Sext     -> SExt
-      LM_Fptrunc  -> FPTrunc
-      LM_Fpext    -> FPToUI
-      LM_Fptoui   -> FPToUI
-      LM_Fptosi   -> FPToSI
-      LM_Uitofp   -> UIToFP
-      LM_Sitofp   -> SIToFP
-      LM_Ptrtoint -> PtrToInt
-      LM_Inttoptr -> IntToPtr
-      LM_Bitcast  -> BitCast)
-             $ (llvmVarToOperand op) (llvmTypeToType typeTo) [] -- ignore metadata for now
-
 llvmVarToOperand :: LlvmVar -> Operand
-llvmVarToOperand
-    | (LMGlobalVar str ty link sec ali con) = LocalReference (Name (unpackFS str)) -- this isn't right, maybe this should just be undefined
-    | (LMLocalVar uniq ty) = LocalReference (UnName uniq) -- types might not match up here
-    | (LMNLocalVar str ty) = LocalReference (Name (unpackFS str))
-    | (LMLitVar lit) = ConstantOperand (llvmStaticToConstant (LMStaticLit lit))
+llvmVarToOperand (LMGlobalVar str ty link sec ali con) = ConstantOperand (GlobalReference (mkName str))
+-- N.B: Hashing a Unique technically doesn't guarantee a unique Int.
+--      However, uniques are generated by the sequence Unique 1, Unique 2, ...
+--      Thus we won't get any collisions until we call newUnique 2^32 or 2^64 times.
+llvmVarToOperand (LMLocalVar uniq ty) = LocalReference (UnName (hashUnique uniq))
+llvmVarToOperand (LMNLocalVar str ty) = LocalReference (mkName str)
+llvmVarToOperand (LMLitVar lit) = ConstantOperand (llvmStaticToConstant (LMStaticLit lit))
 
+llvmParameterToNamedParameter :: LlvmParameter -> Either String Word -> Parameter
+llvmParameterToNamedParameter (ty, attrs) name =
+    Parameter ty' name' attrs'
+        where attrs' = map llvmParamAttrToParameterAttribute attrs
+              ty' = llvmTypeToType ty
+              name' = either Name UnName name
+
+-- Can we get rid of the IO here?
+llvmParameterToParameter :: LlvmParameter -> IO Parameter
+llvmParameterToParameter param = 
+    do name <- newUnique
+       llvmParameterToNamedParameter param (hashUnique name)
+
+platformToDataLayout :: Platform -> DataLayout
+platformToDataLayout platform =
+    case platform of
+      Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 32 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 32 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 128 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64),
+                                                   ((FloatAlign, 80), AlignmentInfo 128 128)]
+                       nativeSizes = Just (Set.FromList [8, 16, 32])
+                     }
+      Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 32 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 128 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
+                                                   --n.b. original data layout (erroneously?) had 2 values for f64, 128:128 and 32:32. Going with 32:32 for now.
+                                                   ((FloatAlign, 80), AlignmentInfo 32 32)],
+                       nativeSizes = Just (Set.FromList [8, 16, 32])
+                     }
+      Platform { platformArch = ArchX86, platformOS = OSLinux } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 32 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 32 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 128 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64),
+                                                   ((FloatAlign, 80), AlignmentInfo 32 32)],
+                       nativeSizes = Just (Set.FromList [8, 16, 32])
+                     }
+      Platform { platformArch = ArchX86_64, platformOS = OSDarwin } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (64, AlignmentInfo 64 64))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 128 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64),
+                                                   ((StackAlign, 0), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 80), AlignmentInfo 128 128)],
+                       nativeSizes = Just (Set.FromList [8, 16, 32, 64])
+                     }
+      Platform { platformArch = ArchX86_64, platformOS = OSLinux } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (64, AlignmentInfo 64 64))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 128 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64),
+                                                   ((StackAlign, 0), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 80), AlignmentInfo 128 128)],
+                       nativeSizes = Just (Set.FromList [8, 16, 32, 64])
+                     }
+      Platform { platformArch = ArchARM {}, platformOS = OSLinux } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 64 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                       nativeSizes = Just (Set.FromList [32])
+                     }
+      Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 64 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                       nativeSizes = Just (Set.FromList [32])
+                     }
+      Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 64 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                       nativeSizes = Just (Set.FromList [32])
+                     }
+      Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
+          DataLayout { endianness = Just LittleEndian,
+                       stackAlignment = Nothing, -- default stack alignment
+                       pointerLayouts = Map.fromList [(AddrSpace 0, (32, AlignmentInfo 32 32))],
+                       typeLayouts = Map.fromList [((IntegerAlign, 1), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 8), AlignmentInfo 8 8),
+                                                   ((IntegerAlign, 16), AlignmentInfo 16 16),
+                                                   ((IntegerAlign, 32), AlignmentInfo 32 32),
+                                                   ((IntegerAlign, 64), AlignmentInfo 64 64),
+                                                   ((FloatAlign, 32), AlignmentInfo 32 32),
+                                                   ((FloatAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 64), AlignmentInfo 64 64),
+                                                   ((VectorAlign, 128), AlignmentInfo 64 128),
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                       nativeSizes = Just (Set.FromList [32])
+                     }
+      _ ->
+          defaultDataLayout
+
+platformToDataLayout :: Platform -> String
+    case platform of
+    Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
+        "i386-apple-darwin9.8"
+    Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
+        "i686-pc-win32"
+    Platform { platformArch = ArchX86, platformOS = OSLinux } ->
+        "i386-pc-linux-gnu"
+    Platform { platformArch = ArchX86_64, platformOS = OSDarwin } ->
+        "x86_64-apple-darwin10.0.0"
+    Platform { platformArch = ArchX86_64, platformOS = OSLinux } ->
+        "x86_64-linux-gnu"
+    Platform { platformArch = ArchARM {}, platformOS = OSLinux } ->
+        "arm-unknown-linux-gnueabi"
+    Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
+        "arm-unknown-linux-androideabi"
+    Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
+        "arm-unknown-nto-qnx8.0.0eabi"
+    Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
+        "arm-apple-darwin10"
+    _ ->
+        ""
+
+llvmVarToName :: LlvmVar -> Name
+llvmVarToName (LMGlobalVar name ty link sec ali con) = Name name
+llvmVarToName (LMLocalVar uniq ty) = UnName uniq
+llvmVarToName (LMNLocalVar name ty) = Name name
+llvmVarToName _ = error "llvmVarToName: not a valid name"
+
+llvmVarToConstant :: LlvmVar -> Constant
+llvmVarToConstant (LMGlobalVar name ty link sec ali con) = 
+llvmVarToConstant (LMLocalVar uniq ty) = undefined
+llvmVarToConstant (LMNLocalVar str ty) = undefined
+llvmVarToConstant (LMLitVar lit) = undefined
+
+mkName :: LMString -> Name
+mkName = Name . unpackFS
+
+metaExprToMetadataNode :: MetaExpr -> MetadataNode
+metaExprToMetadataNode (MetaStr    s ) = MetadataNode [MetadataStringOperand (unpackFS s)]
+metaExprToMetadataNode (MetaNode   n ) = MetadataNodeReference (MetadataNodeID n)
+metaExprToMetadataNode (MetaVar    v ) = undefined
+metaExprToMetadataNode (MetaStruct es) = undefined

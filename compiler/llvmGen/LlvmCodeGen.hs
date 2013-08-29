@@ -77,14 +77,15 @@ llvmCodeGen dflags h us cmm_stream
 
 llvmCodeGen' :: Platform -> Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
 llvmCodeGen' platform cmm_stream
-  = do  -- Preamble
+  = do
         m   <- newModule
         dl  <- newCString (platformToDataLayoutString platform)
         tgt <- newCString (platformToTargetString platform)
         LFC.setDataLayout m dl
         LFC.setTarget m tgt
-{-        renderLlvm pprLlvmHeader -
-        ghcInternalFunctions 
+{-      -- Preamble
+        renderLlvm pprLlvmHeader
+        ghcInternalFunctions
         cmmMetaLlvmPrelude
 
         -- Procedures

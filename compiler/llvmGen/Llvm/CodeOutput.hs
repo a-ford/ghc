@@ -44,6 +44,13 @@ outputLlvmGlobal (LMGlobal var val) = sdocWithDynFlags $ \dflags ->
   error $ "Non Global var ppr as global! "
           ++ showSDoc dflags (ppr var) ++ " " ++ showSDoc dflags (ppr val)
 
+
+{- llvm-general -}
+--outputLlvmGlobal :: LMGlobal -> Global
+outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) = 
+    GlobalVariable name link {-vis-} {-isThreadLocal-} {-addrSp-} {-hasUnnamedAddr-} c {-init-} x a
+
+
 -- | Output out a list of LLVM type aliases.
 --outputLlvmAliases :: [LlvmAlias] -> 
 outputLlvmAliases alis = mapM_ outputLlvmAlias alis
@@ -240,7 +247,7 @@ outputMalloc tp amount = LCI.arrayMalloc ((llvmTypeToType tp)::amount)
 outputAlloca tp amount = LCI.alloca -- ...
 
 --outputGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> 
-outputGetElementPtr inb ptr idx = undefined
+outputGetElementPtr inb ptr idx = 
 
 --outputReturn :: Maybe LlvmVar -> 
 outputReturn (Just var) = LCI.ret (llvmVarToValue var)
