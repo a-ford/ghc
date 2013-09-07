@@ -134,34 +134,39 @@ llvmParamAttrToParameterAttribute attr =
       NoCapture -> NoCapture
       Nest -> Nest
 
+llvmCmpOpToPredicate :: LlvmCmpOp -> Either IntegerPredicate FloatingPointPredicate
+llvmCmpOpToPredicate op = 
+    let intOp = llvmCmpOpToIntegerPredicate op
+        fpOp  = llvmCmpOpToFloatingPointPredicate op
+    in if intOp /= Nothing then Left (fromJust intOp) else Right (fromJust fpOp)
+
 -- Convert comparator operators to integer predicates
-llvmCmpOpToIntegerPredicate :: LlvmCmpOp -> IntegerPredicate
+llvmCmpOpToIntegerPredicate :: LlvmCmpOp -> Maybe IntegerPredicate
 llvmCmpOpToIntegerPredicate op =
     case op of
-      LM_CMP_Eq  -> EQ
-      LM_CMP_Ne  -> NE
-      LM_CMP_Ugt -> UGT
-      LM_CMP_Uge -> UGE
-      LM_CMP_Ult -> ULT
-      LM_CMP_Ule -> ULE
-      LM_CMP_Sgt -> SGT
-      LM_CMP_Sge -> SGE
-      LM_CMP_Slt -> SLT
-      LM_CMP_Sle -> SLE
-      _          -> error $ (show op) ++ " is not an integer comparator."
-
+      LM_CMP_Eq  -> Just EQ
+      LM_CMP_Ne  -> Just NE
+      LM_CMP_Ugt -> Just UGT
+      LM_CMP_Uge -> Just UGE
+      LM_CMP_Ult -> Just ULT
+      LM_CMP_Ule -> Just ULE
+      LM_CMP_Sgt -> Just SGT
+      LM_CMP_Sge -> Just SGE
+      LM_CMP_Slt -> Just SLT
+      LM_CMP_Sle -> Just SLE
+      _          -> Nothing
 
 -- The difference between O and U prefixed predicates relates to qNaN (quiet NaN) values
 llvmCmpOpToFloatingPointPredicate :: LlvmCmpOp -> FloatingPointPredicate
 llvmCmpOpToFloatingPointPredicate op =
     case op of
-      LM_CMP_Feq -> OEQ
-      LM_CMP_Fne -> ONE
-      LM_CMP_Fgt -> OGT
-      LM_CMP_Fge -> OGE
-      LM_CMP_Flt -> OLT
-      LM_CMP_Fle -> OLE
-      _          -> error $ (show op) ++ " is not an floating point comparator."
+      LM_CMP_Feq -> Just OEQ
+      LM_CMP_Fne -> Just ONE
+      LM_CMP_Fgt -> Just OGT
+      LM_CMP_Fge -> Just OGE
+      LM_CMP_Flt -> Just OLT
+      LM_CMP_Fle -> Just OLE
+      _          -> Nothing
 
 
 llvmVarToOperand :: LlvmVar -> Operand
@@ -374,16 +379,100 @@ llvmVarToName (LMNLocalVar name ty) = Name name
 llvmVarToName _ = error "llvmVarToName: not a valid name"
 
 llvmVarToConstant :: LlvmVar -> Constant
-llvmVarToConstant (LMGlobalVar name ty link sec ali con) = 
-llvmVarToConstant (LMLocalVar uniq ty) = undefined
-llvmVarToConstant (LMNLocalVar str ty) = undefined
-llvmVarToConstant (LMLitVar lit) = undefined
+llvmVarToConstant v@(LMGlobalVar name ty link sec ali con) = GlobalReference (llvmVarToName v)
+llvmVarToConstant v@(LMLocalVar uniq ty) = 
+llvmVarToConstant v@(LMNLocalVar str ty) = undefined
+llvmVarToConstant v@(LMLitVar lit) = undefined
 
 mkName :: LMString -> Name
 mkName = Name . unpackFS
 
 metaExprToMetadataNode :: MetaExpr -> MetadataNode
-metaExprToMetadataNode (MetaStr    s ) = MetadataNode [MetadataStringOperand (unpackFS s)]
-metaExprToMetadataNode (MetaNode   n ) = MetadataNodeReference (MetadataNodeID n)
-metaExprToMetadataNode (MetaVar    v ) = undefined
-metaExprToMetadataNode (MetaStruct es) = undefined
+metaExprToMetadataNode (MetaStr    s ) =
+    MetadataNode [MetadataStringOperand (unpackFS s)]
+metaExprToMetadataNode (MetaNode   n ) =
+    MetadataNodeReference (MetadataNodeID n)
+metaExprToMetadataNode (MetaVar    v ) =
+    case v of
+      LMGlobalVar name LMMetadata link sec ali con ->
+          MetadataNode [Just (ConstantOperand (llvmVarToConstant v))]
+      LMLocalVar uniq LMMetadata ->
+          MetadataNode [Just (LocalReference (llvmVarToName v))]
+      LMNLocalVar str LMMetadata ->
+          MetadataNode [Just (LocalReference (llvmVarToName v))]
+      _ -> error "metaExprToMetadataNode: variable is not of type LMMetadata"
+metaExprToMetadataNode (MetaStruct es) =
+    MetadataNode $ map (Just . outputLlvmMetaExpr) es
+
+llvmLitToConstant :: LlvmLit -> Constant
+llvmLitToConstant lit =
+    case lit of
+      LMIntLit i ty -> Int (llvmWidthInBits dFlags ty) i
+      LMFloatLit d ty -> Float (floatToSomeFloat d ty)
+      LMNullLit ty -> Null (llvmTypeToType ty)
+      LMVectorLit lits -> Vector (map llvmLitToConstant lits)
+      LMUndefLit ty -> Undef (llvmTypeToType ty)
+
+llvmExpressionToConstant :: LlvmExpression -> Constant
+llvmExpressionToConstant expr =
+    case expr of
+      Alloca     tp amount          -> undefined
+      LlvmOp     op left right      -> llvmOpToConstant op left right
+      Call       tp fp args attrs   -> undefined
+      CallM      tp fp args attrs   -> undefined
+      Cast       LM_Bitcast from to -> BitCast (llvmVarToConstant from) (llvmTypeToType to)
+      Cast       _ from to          -> undefined
+      Compare    op left right      -> llvmCompareToConstant op left right
+      Extract    vec idx            -> llvmExtractToConstant vec idx
+      Insert     vec elt idx        -> llvmInsertToConstant vec elt idx
+      GetElemPtr inb ptr indexes    -> llvmGetElemPtrToConstant inb ptr indexes
+      Load       ptr                -> undefined
+      Malloc     tp amount          -> undefined
+      Phi        tp precessors      -> undefined
+      Asm        asm c ty v se sk   -> undefined
+      MExpr      meta e             -> undefined
+
+llvmCompareToConstant :: LlvmCmpOp -> LlvmVar -> LlvmVar -> Constant
+llvmCompareToConstant op left right =
+    case op' of
+      Right iOp -> ICmp iOp l r
+      Left fpOp -> FCmp fpOp l r
+    where op' = llvmCmpOpToPredicate op
+          l = llvmVarToConstant left
+          r = llvmVarToConstant right
+
+llvmExtractToConstant :: LlvmVar -> LlvmVar -> Constant
+llvmExtractToConstant vec idx =
+    ExtractElement (llvmVarToConstant vec) (llvmVarToConstant idx)
+
+llvmInsertToConstant :: LlvmVar -> LlvmVar -> LlvmVar -> Constant
+llvmInsertToConstant vec elt idx =
+    InsertElement (llvmVarToConstant vec) (llvmVarToConstant elt) (llvmVarToConstant idx)
+
+llvmGetElemPtrToConstant :: Bool -> LlvmVar -> [LlvmVar] -> Constant
+llvmGetElemPtrToConstant inb ptr indexes =
+    GetElementPtr inb (llvmVarToConstant ptr) (map llvmVarToConstant indexes)
+
+llvmOpToConstant :: LlvmMachOp -> LlvmVar -> LlvmVar -> Constant
+llvmOpToConstant op left right =
+    case op of
+       (LM_MO_Add  -> Add False False
+        LM_MO_Sub  -> Sub False False
+        LM_MO_Mul  -> Mul False False
+        LM_MO_UDiv -> UDiv False
+        LM_MO_SDiv -> SDiv False
+        LM_MO_URem -> URem
+        LM_MO_SRem -> SRem
+        LM_MO_FAdd -> FAdd
+        LM_MO_FSub -> FSub
+        LM_MO_FMul -> FMul
+        LM_MO_FDiv -> FDiv
+        LM_MO_FRem -> FRem
+        LM_MO_Shl  -> Shl False False
+        LM_MO_LShr -> LShr False
+        LM_MO_AShr -> AShr False
+        LM_MO_And  -> And
+        LM_MO_Or   -> Or
+        LM_MO_Xor  -> Xor) $ left' right'
+           where left' = llvmVarToConstant left
+                 right' = llvmVarToConstant right

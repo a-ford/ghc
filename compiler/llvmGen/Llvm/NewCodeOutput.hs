@@ -8,6 +8,7 @@ import Llvm.AbsSyn
 import Llvm.MetaData
 import Llvm.Types
 
+import DynFlags
 import Unique
 
 -- metadata and global assignment are the main sticking points
@@ -17,19 +18,19 @@ import Unique
 --------------------------------------------------------------------------------
 
 -- | Output out a whole LLVM module.
-outputLlvmModule :: LlvmModule -> DFlags -> Module --done
-outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) dflags =
-    Module {
-          moduleName = "<module-name-here>",
-          moduleDataLayout = platformToDataLayout (targetPlatform dflags)
-          moduleTargetTriple = Just (platformToTriple (targetPlatform dflags))
-          moduleDefinintions = concat [alis, metas, glos, decs funs]
-        }
-        where alis = outputLlvmAliases aliases
-              metas = outputLlvmMetas meta
-              glos = outputLlvmGlobals globals
-              decs = outputLlvmFunctionDecls decls
-              funs = outputLlvmFunctions funcs
+outputLlvmModule :: LlvmModule -> DynFlags -> Module --done
+outputLlvmModule (LlvmModule comments aliases meta globals decls funcs) dflags
+    = Module {
+        moduleName = "<module-name-here>",
+        moduleDataLayout = platformToDataLayout (targetPlatform dflags)
+        moduleTargetTriple = Just (platformToTriple (targetPlatform dflags))
+        moduleDefinintions = concat [alis, metas, glos, decs funs]
+      }
+    where alis  = outputLlvmAliases aliases
+          metas = outputLlvmMetas meta
+          glos  = outputLlvmGlobals globals
+          decs  = outputLlvmFunctionDecls decls
+          funs  = outputLlvmFunctions funcs
 
 -- | Output out a list of global mutable variable definitions
 outputLlvmGlobals :: [LMGlobal] -> [Definition] --done
@@ -39,14 +40,9 @@ outputLlvmGlobals ls = map outputLlvmGlobal ls
 outputLlvmGlobal :: LMGlobal -> Definition --done
 outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link x a c) dat) =
     GlobalDefinition
-    (GlobalVariable {
+    (globalVariableDefaults {
        name = mkName str,
        linkage = (llvmLinkageTypeToLinkage link)
-       visibility = Default,
-       isThreadLocal = False,
-       addrSpace = 0,
-       -- unnamed_addr indicates that the address is not significant, only the content
-       hasUnnamedAddr = False,
        isConstant = (con == Constant),
        type' = (llvmTypeToType ty),
        initializer = dat >>= llvmStaticToConstant,
@@ -78,12 +74,22 @@ outputLlvmMeta (MetaUnamed n m) = MetadataNodeDefinition (MetaNodeID n) [(Just (
 outputLlvmMeta (MetaNamed n m) = NamedMetadataDefinition (unpackFS n) (map MetaNodeID m)
 
 -- | Output an LLVM metadata value.
-outputLlvmMetaExpr :: MetaExpr -> Operand --not done
-outputLlvmMetaExpr (MetaStr    s ) = MetadataStringOperand (unpackFS s)
-outputLlvmMetaExpr (MetaNode   n ) = MetadataNodeOperand (MetadataNodeReference (MetadataNodeID n))
-outputLlvmMetaExpr (MetaVar    v ) = undefined --MetadataNodeOperand (MetadataNode 
-outputLlvmMetaExpr (MetaStruct es) = undefined
-
+outputLlvmMetaExpr :: MetaExpr -> Operand --done
+outputLlvmMetaExpr (MetaStr    s ) =
+    MetadataStringOperand (unpackFS s)
+outputLlvmMetaExpr (MetaNode   n ) =
+    MetadataNodeOperand (MetadataNodeReference (MetadataNodeID n))
+outputLlvmMetaExpr (MetaVar    v ) =
+    case v of
+      LMGlobalVar name LMMetadata link sec ali con ->
+          ConstantOperand (llvmVarToConstant v)
+      LMLocalVar uniq LMMetadata ->
+           LocalReference (llvmVarToName v)
+      LMNLocalVar str LMMetadata ->
+          LocalReference (llvmVarToName v)
+      _ -> error "outputLlvmMetaExpr: variable is not of type LMMetadata"
+outputLlvmMetaExpr (MetaStruct es) =
+    MetadataNodeOperand (MetadataNode $ map (Just . outputLlvmMetaExpr) es)
 
 -- | Output out a list of function definitions.
 outputLlvmFunctions :: LlvmFunctions -> [Global] --done
@@ -94,17 +100,17 @@ outputLlvmFunctions funcs = map outputLlvmFunction funcs
 outputLlvmFunction :: LlvmFunction -> Global --done
 outputLlvmFunction (LlvmFunction dec@(LLVMFunctionDecl name link cc retTy vArgs params ali)
                                  args attrs sec body)
-    = Function {linkage = llvmLinkageToLinkage link,
-                visibility = Default,
-                callingConvention = llvmCallConventionToCallingConvention cc,
-                returnAttributes = [],
-                returnType = llvmTypeToType retTy,
-                name = mkName name,
-                parameters = (map llvmParameterToParameter params, vArgs==VarArgs),
-                functionAttributes = map llvmFuncAttrToFunctionAttribute attrs,
-                section = sec >>= unpackFS,
-                alignment = ali',
-                basicBlocks = outputLlvmBlocks body}
+    = functionDefaults {
+        linkage = llvmLinkageToLinkage link,
+        callingConvention = llvmCallConventionToCallingConvention cc,
+        returnType = llvmTypeToType retTy,
+        name = mkName name,
+        parameters = (map llvmParameterToParameter params, vArgs==VarArgs),
+        functionAttributes = map llvmFuncAttrToFunctionAttribute attrs,
+        section = sec >>= unpackFS,
+        alignment = ali',
+        basicBlocks = outputLlvmBlocks body
+      }
       where ali' = if ali==Nothing then 0 else fromJust ali
 
 {-
@@ -155,14 +161,14 @@ outputLlvmBlock (LlvmBlock blockId stmts) =
 --outputLlvmBlockLabel id = undefined 
 
 -- | Output an LLVM statement.
-outputLlvmStatement :: LlvmStatement -> Either Instruction Terminator --nearly done
+outputLlvmStatement :: LlvmStatement -> Either Instruction Terminator --done
 outputLlvmStatement stmt =
   case stmt of
     MetaStmt    meta s        -> outputMetaStatement meta s
     _                         -> outputMetaStatement [] stmt
 
 -- | Output an LLVM statement with metadata annotations.
-outputMetaStatement :: [MetaAnnot] -> LlvmStatement -> Either Instruction Terminator  --not done
+outputMetaStatement :: [MetaAnnot] -> LlvmStatement -> Either Instruction Terminator --done(?)
 outputMetaStatement meta stmt =
     case stmt of
       Assignment  dst expr      -> outputAssignment dst expr meta           -- Broken
@@ -186,7 +192,7 @@ outputLlvmExpression expr
       MExpr      meta e           -> outputMetaExpr meta e
       _                           -> outputMetaExpr [] e
 
-outputMetaExpr :: [MetaAnnot] -> LlvmExpression -> Instruction
+outputMetaExpr :: [MetaAnnot] -> LlvmExpression -> Instruction --done
 outputMetaExpr meta expr =
     case expr of
       Alloca     tp amount        -> outputAlloca tp amount meta
@@ -251,7 +257,7 @@ outputMachOp op left right metas =
 
 outputCmpOp :: LlvmCmpOp -> LlvmVar -> LlvmVar -> [MetaAnnot] -> Instruction ---done
 outputCmpOp op left right metas = ICmp iPred left' right' metas'
-    where iPred = llvmCmpOpToIntegerPredicate op
+    where iPred = fromJust (llvmCmpOpToIntegerPredicate op)
           left' = llvmVarToOperand left
           right' = llvmVarToOperand right
           metas' = outputMetaAnnots metas
@@ -259,9 +265,9 @@ outputCmpOp op left right metas = ICmp iPred left' right' metas'
 outputAssignment :: LlvmVar -> LlvmExpression -> [MetaAnnot] -> --not done
 outputAssignment var expr metas =
     case var of
-      LMGlobalVar name ty link sec ali con ->
-      LMLocalVar uniq ty ->
-      LMLocalVar LMNLocalVar name ty ->
+      LMGlobalVar name ty link sec ali con -> undefined
+      LMLocalVar uniq ty -> undefined
+      LMLocalVar LMNLocalVar name ty -> undefined
       _ -> error "outputAssignment: not a valid var to assign."
 
 outputSyncOrdering :: LlvmSyncOrdering -> MemoryOrdering --done
@@ -272,7 +278,7 @@ outputSyncOrdering SyncRelease   = Release
 outputSyncOrdering SyncAcqRel    = AcquireRelease
 outputSyncOrdering SyncSeqCst    = SequentiallyConsistent
 
--- The st boolean might need to be negated.
+-- The st (single-thread) boolean might need to be negated.
 outputFence :: Bool -> LlvmSyncOrdering -> [MetaAnnot] -> Instruction --done
 outputFence st ord metas = Fence atom metas'
     where atom = Atomicity st (outputSyncOrdering ord)
@@ -308,7 +314,7 @@ outputStore val dst metas
     metas' = outputMetaAnnots metas
 
 outputCast :: LlvmCastOp -> LlvmVar -> LlvmType -> [MetaAnnot] -> Instruction --done
-outputCast op var ty metas = 
+outputCast op var ty metas =
     (case op of
       LM_Trunc    -> Trunc
       LM_Zext     -> ZExt
@@ -328,8 +334,8 @@ outputCast op var ty metas =
 -- One solution to deal with this is to call the @malloc function instead. It may also be possible
 -- to replace it with alloca instruction(s), or just not generate mallocs in the first place.
 -- I think we can get away without generating these in the first place.
---outputMalloc :: LlvmType -> Int -> 
---outputMalloc tp amount = LCI.arrayMalloc ((llvmTypeToType tp)::amount)
+outputMalloc :: LlvmType -> Int -> Instruction --'done'
+outputMalloc tp amount = undefined
 
 -- Must specify a width for the amount of memory requested, assume a 64 bit quantity.
 outputAlloca :: LlvmType -> Int -> [MetaAnnot] -> Instruction --done
@@ -401,8 +407,8 @@ outputInsert vec elt idx metas = InsertElement vec' elt' idx' metas'
           idx' = llvmVarToOperand idx
           metas' = outputMetaAnnots metas
 
-outputMetaAnnots :: [MetaAnnot] -> [InstructionMetadata]
+outputMetaAnnots :: [MetaAnnot] -> [InstructionMetadata] --done
 outputMetaAnnots metas = map outputMetaAnnot metas
 
-outputMetaAnnots :: MetaAnnot -> InstructionMetadata
+outputMetaAnnots :: MetaAnnot -> InstructionMetadata --done
 outputMetaAnnots (MetaAnnot str expr) = (unpackFS str, metaExprToMetadataNode expr)
