@@ -30,23 +30,28 @@ import qualified Stream
 
 import Control.Monad ( when )
 import Data.IORef ( writeIORef )
-import Data.Maybe ( fromMaybe, catMaybes )
+import Data.Maybe ( fromMaybe, catMaybes )sdf
 import System.IO
 
+{-
 import LLVM.Core as LC
 import LLVM.Core.Util as LCU
 import LLVM.Core.Instructions as LCI
 import LLVM.Core.Type as LCT
 import LLVM.FFI.Core as LFC
 import LLVM.Wrapper.Core as LWC
+-}
+
+import LLVM.General
+--import LLVM.General.Pure
 
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> Handle -> UniqSupply
+llvmCodeGen :: DynFlags -> FilePath -> UniqSupply
                -> Stream.Stream IO RawCmmGroup ()
                -> IO ()
-llvmCodeGen dflags h us cmm_stream
+llvmCodeGen dflags filenm us cmm_stream
   = do bufh <- newBufHandle h
 
        -- Pass header
@@ -73,11 +78,32 @@ llvmCodeGen dflags h us cmm_stream
        runLlvm dflags ver bufh us $
          llvmCodeGen' (targetPlatform dflags) (liftStream cmm_stream)
 
-       bFlush bufh
+       -- write bitcode to file
+       writeBitcodeToFile filenm (envModule getEnv)
+
+--       bFlush bufh
 
 llvmCodeGen' :: Platform -> Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
-llvmCodeGen' platform cmm_stream
-  = do
+llvmCodeGen' platform cmm_stream = do
+  -- Preamble
+  -- Set the data layout and target
+  let dl = platformToDataLayout platform
+  let tt = platformToTargetTriple platform
+  modifyEnv (\env -> env {envModule = envModule env {moduleDataLayout = dl,
+                                                     moduleTargetTriple = tt}})
+
+  ghcInternalFunctions
+  cmmMetaLlvmPrelude
+
+  -- Procedures
+  let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
+  _ <- Stream.collect llvmStream
+
+  -- Declare aliases for forward references
+  outputLlvm $ outputLlvmData =<< generateAliases
+
+  -- Postamble
+  cmmUsedLlvmGens
 
 {-      m   <- newModule
         dl  <- newCString (platformToDataLayoutString platform)
@@ -86,14 +112,14 @@ llvmCodeGen' platform cmm_stream
         LFC.setTarget m tgt
 -}
 {-      -- Preamble
-        renderLlvm pprLlvmHeader
+        renderLlvm pprLlvmHeader -- i.e. data layout plus target triple
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
         -- Procedures
-        let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
-        _ <- Stream.collect llvmStream
-
+        let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream -- :: Stream LlvmM () () 
+        _ <- Stream.collect llvmStream  -- Stream.collect turns a stream into a regular list
+                                        -- :: LlvmM [()]
         -- Declare aliases for forward references
         renderLlvm . pprLlvmData =<< generateAliases
 
@@ -136,7 +162,7 @@ cmmDataLlvmGens statics
            regGlobal _  = return ()
        mapM_ regGlobal (concat gss)
 
-       renderLlvm $ pprLlvmData (concat gss, concat tss)
+       outputLlvm $ outputLlvmData (concat gss, concat tss)
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen ::RawCmmDecl -> LlvmM ()
@@ -158,10 +184,10 @@ cmmLlvmGen cmm@CmmProc{} = do
     _codeSection <- freshSectionId
 
     -- pretty print
-    (docs, ivars) <- fmap unzip $ mapM (pprLlvmCmmDecl itableSection) llvmBC
+    (defs, ivars) <- fmap unzip $ mapM (outputLlvmCmmDecl itableSection) llvmBC
 
     -- Output, note down used variables
-    renderLlvm (vcat docs)
+    outputLlvm defs
     mapM_ markUsedVar $ concat ivars
 
 cmmLlvmGen _ = return ()
@@ -184,7 +210,7 @@ cmmMetaLlvmPrelude = do
           Just p  -> MetaNode p
           Nothing -> MetaVar $ LMLitVar $ LMNullLit i8Ptr
         ]
-  renderLlvm $ ppLlvmMetas metas
+  outputLlvm $ outputLlvmMetas metas
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
@@ -209,7 +235,7 @@ cmmUsedLlvmGens = do
       lmUsed    = LMGlobal lmUsedVar (Just usedArray)
   if null ivars
      then return ()
-     else renderLlvm $ pprLlvmData ([lmUsed], [])
+     else outputLlvm $ outputLlvmData ([lmUsed], [])
 
 -- Converts a platform to strings representing the data layout and target OS+Arch
 platformToDataLayoutString :: Platform -> String

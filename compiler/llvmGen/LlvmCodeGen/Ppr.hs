@@ -24,7 +24,7 @@ import Unique
 -- ----------------------------------------------------------------------------
 -- * Top level
 --
-
+{-
 -- | Header code for LLVM modules
 pprLlvmHeader :: SDoc
 pprLlvmHeader = moduleLayout
@@ -64,8 +64,9 @@ moduleLayout = sdocWithPlatform $ \platform ->
     _ ->
         -- FIX: Other targets
         empty
+-}
 
-
+{-
 -- | Pretty print LLVM data code
 pprLlvmData :: LlvmData -> SDoc
 pprLlvmData (globals, types) =
@@ -76,8 +77,19 @@ pprLlvmData (globals, types) =
         types'   = vcat $ map ppLlvmTys types
         globals' = ppLlvmGlobals globals
     in types' $+$ globals'
+-}
 
+outputLlvmData :: LlvmData -> [Definition]
+outputLlvmData (globals, types) =
+    let outputLlvmTys (LMAlias    a) = outputLlvmAlias a
+        outputLlvmTys (LMFunction f) = undefined -- this should be defined
+        outputLlvmTys _other         = undefined
 
+        types'   = map outputLlvmTys types
+        globals' = outputLlvmGlobals globals
+    in types' ++ globals'
+
+{-
 -- | Pretty print LLVM code
 pprLlvmCmmDecl :: Int -> LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
 pprLlvmCmmDecl _ (CmmData _ lmdata)
@@ -102,8 +114,34 @@ pprLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
        fun <- mkLlvmFunc live lbl' link  sec' lmblocks
 
        return (idoc $+$ ppLlvmFunction fun, ivar)
+-}
 
+-- | Pretty print LLVM code
+outputLlvmCmmDecl :: Int -> LlvmCmmDecl -> LlvmM ([Definition], [LlvmVar])
+outputLlvmCmmDecl _ (CmmData _ lmdata)
+  = return (concat $ map outputLlvmData lmdata, [])
 
+outputLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
+  = do (idoc, ivar) <- case mb_info of
+                        Nothing -> return ([], [])
+                        Just (Statics info_lbl dat)
+                         -> outputInfoTable count info_lbl (Statics entry_lbl dat)
+
+       let sec = mkLayoutSection (count + 1)
+           (lbl',sec') = case mb_info of
+                           Nothing                   -> (entry_lbl, Nothing)
+                           Just (Statics info_lbl _) -> (info_lbl,  sec)
+           link = if externallyVisibleCLabel lbl'
+                      then ExternallyVisible
+                      else Internal
+           lmblocks = map (\(BasicBlock id stmts) ->
+                                LlvmBlock (getUnique id) stmts) blks
+
+       fun <- mkLlvmFunc live lbl' link  sec' lmblocks
+
+       return (idoc ++ (outputLlvmFunction fun), ivar)
+
+{-
 -- | Pretty print CmmStatic
 pprInfoTable :: Int -> CLabel -> CmmStatics -> LlvmM (SDoc, [LlvmVar])
 pprInfoTable count info_lbl stat
@@ -124,6 +162,28 @@ pprInfoTable count info_lbl stat
        if length ldata /= 1
           then Outputable.panic "LlvmCodeGen.Ppr: invalid info table!"
           else return (pprLlvmData ([ldata'], ltypes), llvmUsed)
+-}
+
+-- | Output CmmStatic
+outputInfoTable :: Int -> CLabel -> CmmStatics -> LlvmM ([Definition], [LlvmVar])
+outputInfoTable count info_lbl stat
+  = do (ldata, ltypes) <- genLlvmData (Text, stat)
+
+       dflags <- getDynFlags
+       let setSection (LMGlobal (LMGlobalVar _ ty l _ _ c) d) = do
+             lbl <- strCLabel_llvm info_lbl
+             let sec = mkLayoutSection count
+                 ilabel = lbl `appendFS` fsLit iTableSuf
+                 gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
+                 v = if l == Internal then [gv] else []
+             funInsert ilabel ty
+             return (LMGlobal gv d, v)
+           setSection v = return (v,[])
+
+       (ldata', llvmUsed) <- setSection (last ldata)
+       if length ldata /= 1
+          then error "outputInfoTable: invalid info table!"
+          else return (outputLlvmData ([ldata'], ltypes), llvmUsed)
 
 
 -- | We generate labels for info tables by converting them to the same label

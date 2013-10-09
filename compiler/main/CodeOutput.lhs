@@ -168,9 +168,12 @@ outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       {-# SCC "llvm_output" #-} doOutput filenm $
+       llvmCodeGen dflags filenm ncg_uniqs cmm_stream
+
+{-       {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
                  llvmCodeGen dflags f ncg_uniqs cmm_stream
+-}
 \end{code}
 
 

@@ -1,8 +1,10 @@
+module Llvm.TypeConversions where
+{-
 --------------------------------------------------------------------------------
 -- | Conversions from backend types to Haskell LLVM bindings types
 --
 
-module Llvm.TypeConversions where
+
 
 import Llvm.AbsSyn
 import Llvm.MetaData
@@ -249,3 +251,4 @@ llvmVarToFunction | LMGlobalVar name ty link sec ali con =
                   | LMLitVar lit = undefined
 
 metaExprTo
+-}

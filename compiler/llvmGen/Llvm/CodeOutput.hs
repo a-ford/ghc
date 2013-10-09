@@ -1,8 +1,10 @@
+module Llvm.CodeOutput where
+{-
 --------------------------------------------------------------------------------
 -- | Call into the Haskell LLVM API to generate LLVM bitcode.
 --
 
-module Llvm.CodeOutput where
+
 
 import Llvm.AbsSyn
 import Llvm.MetaData
@@ -296,3 +298,4 @@ outputMetaExpr meta expr = undefined
 
 --outputMetaAnnots :: [MetaAnnot] -> 
 outputMetaAnnots meta = undefined 
+-}

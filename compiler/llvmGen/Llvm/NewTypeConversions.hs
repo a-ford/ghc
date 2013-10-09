@@ -349,7 +349,7 @@ platformToDataLayout platform =
       _ ->
           defaultDataLayout
 
-platformToDataLayout :: Platform -> String
+platformToTargetTriple :: Platform -> String
     case platform of
     Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
         "i386-apple-darwin9.8"

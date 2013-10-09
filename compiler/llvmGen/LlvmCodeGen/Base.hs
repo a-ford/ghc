@@ -54,6 +54,9 @@ import UniqSupply
 import ErrUtils
 import qualified Stream
 
+import LLVM.General
+--import LLVM.General.Pure
+
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
 --
@@ -192,6 +195,7 @@ data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
+  , envModule :: Module            -- ^ Output module
   , envUniq :: UniqSupply          -- ^ Supply of unique values
   , envNextSection :: Int          -- ^ Supply of fresh section IDs
   , envFreshMeta :: Int            -- ^ Supply of fresh metadata IDs
@@ -238,6 +242,7 @@ runLlvm dflags ver out us m = do
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
+                      , envModule = defaultModule
                       , envUniq = us
                       , envFreshMeta = 0
                       , envUniqMeta = emptyUFM
@@ -320,6 +325,14 @@ renderLlvm sdoc = do
     dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
     return ()
 
+-- | Add a definition to a given module
+appendDefinitions :: Module -> [Definition] -> Module
+appendDefinitions mod defs = mod {moduleDefinitions =  (moduleDefintions mod) ++ defs}
+
+-- | Add a definition to the llvm module.
+outputLlvm :: [Definition] -> LlvmM ()
+outputLlvm defs = modifyEnv $ \env -> env {envModule = appendDefinitions envModule defs}
+
 -- | Run a @UniqSM@ action with our unique supply
 runUs :: UniqSM a -> LlvmM a
 runUs m = LlvmM $ \env -> do
@@ -371,7 +384,7 @@ ghcInternalFunctions = do
       let n' = fsLit n
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
-      renderLlvm $ ppLlvmFunctionDecl decl
+      outputLlvm $ [outputLlvmFunctionDecl decl]
       funInsert n' (LMFunction decl)
 
 -- ----------------------------------------------------------------------------
@@ -438,7 +451,7 @@ getGlobalPtr llvmLbl = do
 --
 -- Must be called at a point where we are sure that no new global definitions
 -- will be generated anymore!
-generateAliases :: LlvmM ([LMGlobal], [LlvmType])
+generateAliases :: LlvmM LlvmData
 generateAliases = do
   delayed <- fmap uniqSetToList $ getEnv envAliases
   defss <- flip mapM delayed $ \lbl -> do
