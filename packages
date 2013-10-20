@@ -86,6 +86,6 @@ libraries/llvm-general-pure     -           -
 libraries/mtl                   -           -
 libraries/parsec                -           -
 libraries/setenv                -           -
-libraries/utf8-string           -           -
 libraries/text                  -           -
+libraries/utf8-string           -           -
 .                               -           ghc.git

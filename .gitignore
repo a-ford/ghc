@@ -66,6 +66,7 @@ _darcs/
 /libraries/template-haskell/
 /libraries/unix/
 /libraries/utf8-string/
+
 /nofib/
 /testsuite/
 /utils/haddock/

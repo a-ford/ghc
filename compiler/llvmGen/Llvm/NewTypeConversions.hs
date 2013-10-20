@@ -2,13 +2,13 @@
 -- | Conversions from backend types to llvm-general AST types
 --
 
-module Llvm.NewTypeConversions where
+module Llvm.TypeConversions where
 
 import Llvm.AbsSyn
 import Llvm.MetaData
 import Llvm.Types
 
-import LLVM.General
+import LLVM.General.AST
 
 import Unique
 
@@ -51,10 +51,10 @@ floatToSomeFloat d ty =
     case ty of
       LMFloat    -> Single d
       LMDouble   -> Double d
-      LMFloat80  -> error "80 bit floats unimplemeted"
-            -- X86_FP80 {- need to split into a 16 and 64 bit word -}
-      LMFloat128 -> error "128 bit floats unimplemented"
-            -- Quadruple {- need to split into two 64 bit words -}
+      -- X86_FP80 {- need to split into a 16 and 64 bit word -}
+      LMFloat80  -> error "TypeConversions: X86 specific 80 bit floats not implemented."
+      -- Quadruple {- need to split into two 64 bit words -}
+      LMFloat128 -> error "TypeConversions: 128 bit floats not implemented."
       _          -> error (show ty) ++ " is not an floating type."
 
 llvmTypeToType :: LlvmType -> Type
@@ -137,7 +137,7 @@ llvmParamAttrToParameterAttribute attr =
       Nest -> Nest
 
 llvmCmpOpToPredicate :: LlvmCmpOp -> Either IntegerPredicate FloatingPointPredicate
-llvmCmpOpToPredicate op = 
+llvmCmpOpToPredicate op =
     let intOp = llvmCmpOpToIntegerPredicate op
         fpOp  = llvmCmpOpToFloatingPointPredicate op
     in if intOp /= Nothing then Left (fromJust intOp) else Right (fromJust fpOp)
@@ -189,7 +189,7 @@ llvmParameterToNamedParameter (ty, attrs) name =
 
 -- Can we get rid of the IO here?
 llvmParameterToParameter :: LlvmParameter -> IO Parameter
-llvmParameterToParameter param = 
+llvmParameterToParameter param =
     do name <- newUnique
        llvmParameterToNamedParameter param (hashUnique name)
 
