@@ -70,5 +70,5 @@ import Llvm.AbsSyn
 import Llvm.MetaData
 --import Llvm.PpLlvm
 import Llvm.Types
-import Llvm.NewCodeOutput
-import Llvm.NewTypeConversions
+import Llvm.CodeOutput
+import Llvm.TypeConversions
