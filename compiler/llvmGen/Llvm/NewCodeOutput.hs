@@ -11,13 +11,7 @@ import Llvm.Types
 import DynFlags
 import Unique
 
-<<<<<<< HEAD
-import LLVM.General
-
--- metadata and global assignment are the main sticking points
-=======
 import LLVM.General.AST
->>>>>>> c9412fd54b73333e7dccc26d02adff4cb8e57645
 
 --------------------------------------------------------------------------------
 -- * Top Level Output functions
