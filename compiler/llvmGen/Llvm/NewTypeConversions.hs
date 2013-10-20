@@ -2,13 +2,13 @@
 -- | Conversions from backend types to llvm-general AST types
 --
 
-module Llvm.TypeConversions where
+module Llvm.NewTypeConversions where
 
 import Llvm.AbsSyn
 import Llvm.MetaData
 import Llvm.Types
 
-import LLVM.General.AST
+import LLVM.General
 
 import Unique
 
@@ -51,8 +51,10 @@ floatToSomeFloat d ty =
     case ty of
       LMFloat    -> Single d
       LMDouble   -> Double d
-      LMFloat80  -> X86_FP80 {- need to split into a 16 and 64 bit word -}
-      LMFloat128 -> Quadruple {- need to split into two 64 bit words -}
+      LMFloat80  -> error "80 bit floats unimplemeted"
+            -- X86_FP80 {- need to split into a 16 and 64 bit word -}
+      LMFloat128 -> error "128 bit floats unimplemented"
+            -- Quadruple {- need to split into two 64 bit words -}
       _          -> error (show ty) ++ " is not an floating type."
 
 llvmTypeToType :: LlvmType -> Type

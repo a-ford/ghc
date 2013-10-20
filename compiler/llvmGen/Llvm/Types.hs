@@ -22,8 +22,6 @@ import PprBase
 
 import GHC.Float
 
---import qualified LLVM.Core
-
 -- -----------------------------------------------------------------------------
 -- * LLVM Basic Types and Variables
 --
@@ -722,7 +720,7 @@ data LlvmCmpOp
   | LM_CMP_Fge -- ^ Float greater than or equal
   | LM_CMP_Flt -- ^ Float less than
   | LM_CMP_Fle -- ^ Float less than or equal
-  deriving (Eq, Show)
+  deriving (Eq)
 
 instance Outputable LlvmCmpOp where
   ppr LM_CMP_Eq  = text "eq"
@@ -757,7 +755,7 @@ data LlvmCastOp
   | LM_Ptrtoint -- ^ Pointer to Integer
   | LM_Inttoptr -- ^ Integer to Pointer
   | LM_Bitcast  -- ^ Cast between types where no bit manipulation is needed
-  deriving (Eq, Show)
+  deriving (Eq)
 
 instance Outputable LlvmCastOp where
   ppr LM_Trunc    = text "trunc"

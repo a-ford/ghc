@@ -30,20 +30,10 @@ import qualified Stream
 
 import Control.Monad ( when )
 import Data.IORef ( writeIORef )
-import Data.Maybe ( fromMaybe, catMaybes )sdf
+import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
-{-
-import LLVM.Core as LC
-import LLVM.Core.Util as LCU
-import LLVM.Core.Instructions as LCI
-import LLVM.Core.Type as LCT
-import LLVM.FFI.Core as LFC
-import LLVM.Wrapper.Core as LWC
--}
-
 import LLVM.General
---import LLVM.General.Pure
 
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator

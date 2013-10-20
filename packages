@@ -81,4 +81,11 @@ libraries/random                dph         -
 libraries/primitive             dph         -
 libraries/vector                dph         -
 libraries/dph                   dph         packages/dph.git
+libraries/llvm-general          -           -
+libraries/llvm-general-pure     -           -
+libraries/mtl                   -           -
+libraries/parsec                -           -
+libraries/setenv                -           -
+libraries/utf8-string           -           -
+libraries/text                  -           -
 .                               -           ghc.git

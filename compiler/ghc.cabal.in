@@ -43,17 +43,18 @@ Flag stage3
 Library
     Exposed: False
 
-    Build-Depends: base       >= 4   && < 5,
-                   directory  >= 1   && < 1.3,
+    Build-Depends: base       >= 4.2   && < 4.7,
+                   directory  >= 1.0   && < 1.3,
                    process    >= 1   && < 1.3,
-                   bytestring >= 0.9 && < 0.11,
+                   bytestring >= 0.9.1.10 && < 0.11,
                    time                 < 1.5,
-                   containers >= 0.1 && < 0.6,
-                   array      >= 0.1 && < 0.5,
-                   filepath   >= 1   && < 1.4,
+                   containers >= 0.4.2.1 && < 0.6,
+                   array      >= 0.4 && < 0.5,
+                   filepath   >= 1.1   && < 1.4,
                    Cabal,
                    hpc,
-                   transformers
+                   transformers,
+                   llvm-general
 
     if flag(stage1) && impl(ghc < 7.5)
         Build-Depends: old-time   >= 1   && < 1.2
@@ -142,6 +143,8 @@ Library
         Llvm.MetaData
         Llvm.PpLlvm
         Llvm.Types
+        Llvm.NewCodeOutput
+        Llvm.NewTypeConversions
         LlvmCodeGen
         LlvmCodeGen.Base
         LlvmCodeGen.CodeGen

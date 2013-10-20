@@ -55,7 +55,6 @@ import ErrUtils
 import qualified Stream
 
 import LLVM.General
---import LLVM.General.Pure
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types

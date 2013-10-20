@@ -20,6 +20,7 @@ import FastString
 import Outputable
 import Unique
 
+import LLVM.General
 
 -- ----------------------------------------------------------------------------
 -- * Top level

@@ -2,7 +2,7 @@
 -- | Call into the Haskell LLVM API to generate LLVM bitcode.
 --
 
-module Llvm.CodeOutput where
+module Llvm.NewCodeOutput where
 
 import Llvm.AbsSyn
 import Llvm.MetaData
@@ -10,6 +10,8 @@ import Llvm.Types
 
 import DynFlags
 import Unique
+
+import LLVM.General
 
 -- metadata and global assignment are the main sticking points
 
