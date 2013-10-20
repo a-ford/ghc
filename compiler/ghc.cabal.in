@@ -53,7 +53,17 @@ Library
                    filepath   >= 1   && < 1.4,
                    Cabal,
                    hpc,
-                   transformers
+                   transformers,
+                   llvm-general,
+                   llvm-general-pure,
+                   mtl,
+                   parsec,
+                   setenv,
+                   utf8-string,
+                   template-haskell,
+                   text,
+                   pretty
+
 
     if flag(stage1) && impl(ghc < 7.5)
         Build-Depends: old-time   >= 1   && < 1.2

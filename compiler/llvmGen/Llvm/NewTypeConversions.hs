@@ -34,10 +34,10 @@ llvmVarToGlobal (LMGlobalVar str ty link sec ali con) =
                     visibility = Default,
                     isThreadLocal = False,
                     addrSpace = 0,
-                    hasUnnamedAddr = False, --?
+                    hasUnnamedAddr = False,
                     isConstant = (con == Constant),
                     type' = (llvmTypeToType ty),
-                    initializer = Nothing, --?
+                    initializer = Nothing,
                     section = sec >>= (Just . unpackFS),
                     alignment = if ali==Nothing then 0 else fromJust ali
                   }
@@ -51,8 +51,10 @@ floatToSomeFloat d ty =
     case ty of
       LMFloat    -> Single d
       LMDouble   -> Double d
-      LMFloat80  -> X86_FP80 {- need to split into a 16 and 64 bit word -}
-      LMFloat128 -> Quadruple {- need to split into two 64 bit words -}
+      -- X86_FP80 {- need to split into a 16 and 64 bit word -}
+      LMFloat80  -> error "TypeConversions: X86 specific 80 bit floats not implemented."
+      -- Quadruple {- need to split into two 64 bit words -}
+      LMFloat128 -> error "TypeConversions: 128 bit floats not implemented."
       _          -> error (show ty) ++ " is not an floating type."
 
 llvmTypeToType :: LlvmType -> Type
@@ -63,7 +65,7 @@ llvmTypeToType ty =
       LMDouble -> FloatingPointType 64 IEEE
       LMFloat80 -> FloatingPointType 80 DoubleExtended
       LMFloat128 -> FloatingPointType 128 IEEE
-      LMPointer ty -> PointerType (llvmTypeToType ty) (AddrSpace 0) -- don't know about address space
+      LMPointer ty -> PointerType (llvmTypeToType ty) (AddrSpace 0) -- default address space
       LMArray len ty -> ArrayType len (llvmTypeToType ty)
       LMVector len typ -> VectorType len (llvmTypeToType ty)
       LMLabel -> undefined
@@ -135,7 +137,7 @@ llvmParamAttrToParameterAttribute attr =
       Nest -> Nest
 
 llvmCmpOpToPredicate :: LlvmCmpOp -> Either IntegerPredicate FloatingPointPredicate
-llvmCmpOpToPredicate op = 
+llvmCmpOpToPredicate op =
     let intOp = llvmCmpOpToIntegerPredicate op
         fpOp  = llvmCmpOpToFloatingPointPredicate op
     in if intOp /= Nothing then Left (fromJust intOp) else Right (fromJust fpOp)
@@ -187,7 +189,7 @@ llvmParameterToNamedParameter (ty, attrs) name =
 
 -- Can we get rid of the IO here?
 llvmParameterToParameter :: LlvmParameter -> IO Parameter
-llvmParameterToParameter param = 
+llvmParameterToParameter param =
     do name <- newUnique
        llvmParameterToNamedParameter param (hashUnique name)
 

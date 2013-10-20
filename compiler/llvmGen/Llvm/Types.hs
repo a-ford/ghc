@@ -22,8 +22,6 @@ import PprBase
 
 import GHC.Float
 
---import qualified LLVM.Core
-
 -- -----------------------------------------------------------------------------
 -- * LLVM Basic Types and Variables
 --
