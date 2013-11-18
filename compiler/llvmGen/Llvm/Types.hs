@@ -91,7 +91,8 @@ ppParams varg p
     in ppCommaJoin args <> ptext varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
-type LMSection = Maybe LMString
+--type LMSection = Maybe LMString
+type LMSection = Maybe String
 type LMAlign = Maybe Int
 
 data LMConst = Global      -- ^ Mutable global variable

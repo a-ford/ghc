@@ -54,15 +54,16 @@ Library
                    Cabal,
                    hpc,
                    transformers,
-                   llvm-general,
-                   llvm-general-pure,
                    mtl,
                    parsec,
                    setenv,
                    utf8-string,
                    template-haskell,
                    text,
-                   pretty
+                   pretty,
+                   llvm-general,
+                   llvm-general-pure
+
 
 
     if flag(stage1) && impl(ghc < 7.5)

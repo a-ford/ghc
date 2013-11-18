@@ -167,7 +167,6 @@ outputAsm dflags this_mod filenm cmm_stream
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-
        llvmCodeGen dflags filenm ncg_uniqs cmm_stream
 
 {-       {-# SCC "llvm_output" #-} doOutput filenm $

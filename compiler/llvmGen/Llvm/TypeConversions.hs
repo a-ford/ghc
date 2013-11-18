@@ -4,40 +4,40 @@
 
 module Llvm.TypeConversions where
 
-import Llvm.AbsSyn
+import Llvm.AbsSyn as AbsSyn
 import Llvm.MetaData
-import Llvm.Types
+import Llvm.Types as Types
 
-import LLVM.General.AST
+import LLVM.General.AST as AST
 
 import Unique
 
 -- Many of these functions look kind of like a non-polymorphic id
 
-llvmLinkageTypeToLinkage :: LlvmLinkageType -> Linkage
+llvmLinkageTypeToLinkage :: LlvmLinkageType -> AST.Linkage
 llvmLinkageTypeToLinkage link =
     case link of
-      Internal -> Internal
-      LinkOnce -> LinkOnce
-      Weak -> Weak
-      Appending -> Appending
-      ExternWeak -> ExternWeak
-      ExternallyVisible -> AvailableExternally
-      External -> External
-      Private -> Private
+      Types.Internal -> AST.Internal
+      Types.LinkOnce -> AST.LinkOnce
+      Types.Weak -> AST.Weak
+      Types.Appending -> AST.Appending
+      Types.ExternWeak -> AST.ExternWeak
+      Types.ExternallyVisible -> AST.AvailableExternally
+      Types.External -> AST.External
+      Types.Private -> AST.Private
 
-llvmVarToGlobal :: LlvmVar -> Global
+llvmVarToGlobal :: LlvmVar -> AST.Global
 llvmVarToGlobal (LMGlobalVar str ty link sec ali con) =
                     GlobalVariable {
                     name = mkName str,
-                    linkage = (llvmLinkageTypeToLinkage link)
+                    linkage = (llvmLinkageTypeToLinkage link),
                     visibility = Default,
                     isThreadLocal = False,
                     addrSpace = 0,
-                    hasUnnamedAddr = False, --?
+                    hasUnnamedAddr = False,
                     isConstant = (con == Constant),
                     type' = (llvmTypeToType ty),
-                    initializer = Nothing, --?
+                    initializer = Nothing,
                     section = sec >>= (Just . unpackFS),
                     alignment = if ali==Nothing then 0 else fromJust ali
                   }
@@ -46,58 +46,58 @@ llvmVarToGlobal (LMNLocalVar str ty) = undefined
 llvmVarToGlobal (LMLitVar lit) = undefined
 
 
-floatToSomeFloat :: Double -> LlvmType -> SomeFloat
+floatToSomeFloat :: Double -> LlvmType -> AST.SomeFloat
 floatToSomeFloat d ty =
     case ty of
-      LMFloat    -> Single d
-      LMDouble   -> Double d
+      Types.LMFloat    -> Single d
+      Types.LMDouble   -> Double d
       -- X86_FP80 {- need to split into a 16 and 64 bit word -}
-      LMFloat80  -> error "TypeConversions: X86 specific 80 bit floats not implemented."
+      Types.LMFloat80  -> error "TypeConversions: X86 specific 80 bit floats not implemented."
       -- Quadruple {- need to split into two 64 bit words -}
-      LMFloat128 -> error "TypeConversions: 128 bit floats not implemented."
+      Types.LMFloat128 -> error "TypeConversions: 128 bit floats not implemented."
       _          -> error (show ty) ++ " is not an floating type."
 
-llvmTypeToType :: LlvmType -> Type
+llvmTypeToType :: LlvmType -> AST.Type
 llvmTypeToType ty =
     case ty of
-      LMInt width -> IntegerType width
-      LMFloat -> FloatingPointType 32 IEEE
-      LMDouble -> FloatingPointType 64 IEEE
-      LMFloat80 -> FloatingPointType 80 DoubleExtended
-      LMFloat128 -> FloatingPointType 128 IEEE
-      LMPointer ty -> PointerType (llvmTypeToType ty) (AddrSpace 0) -- don't know about address space
-      LMArray len ty -> ArrayType len (llvmTypeToType ty)
-      LMVector len typ -> VectorType len (llvmTypeToType ty)
-      LMLabel -> undefined
-      LMVoid -> VoidType
-      LMStruct tys -> StructureType false (map llvmTypeToType tys) -- not packed
-      LMAlias ali -> NamedTypeReference
-      LMMetadata -> MetaDataType
-      LMFunction decl@(name link cc ty vArgs params ali) -> FunctionType (llvmTypeToType ty) (map (llvmTypeToType . fst) params) (vArgs == VarArgs)
+      Types.LMInt width -> IntegerType width
+      Types.LMFloat -> FloatingPointType 32 IEEE
+      Types.LMDouble -> FloatingPointType 64 IEEE
+      Types.LMFloat80 -> FloatingPointType 80 DoubleExtended
+      Types.LMFloat128 -> FloatingPointType 128 IEEE
+      Types.LMPointer ty -> PointerType (llvmTypeToType ty) (AddrSpace 0) -- don't know about address space
+      Types.LMArray len ty -> ArrayType len (llvmTypeToType ty)
+      Types.LMVector len typ -> VectorType len (llvmTypeToType ty)
+      Types.LMLabel -> undefined
+      Types.LMVoid -> VoidType
+      Types.LMStruct tys -> StructureType false (map llvmTypeToType tys) -- not packed
+      Types.LMAlias ali -> NamedTypeReference
+      Types.LMMetadata -> MetaDataType
+      Types.LMFunction decl@(LlvmFunctionDecl name link cc ty vArgs params ali) -> FunctionType (llvmTypeToType ty) (map (llvmTypeToType . fst) params) (vArgs == VarArgs)
 
-llvmStaticToConstant :: LlvmStatic -> Constant
+llvmStaticToConstant :: LlvmStatic -> AST.Constant
 llvmStaticToConstant stat =
     case stat of
-      LMComment str -> undefined
-      LMStaticLit lit -> 
+      Types.LMComment str -> undefined
+      Types.LMStaticLit lit ->
           case lit of
-            LMIntLit i width -> Int width i
-            LMFloatLit d ty  -> Float (floatToSomeFloat d ty)
-            LMNullLit ty     -> Null (llvmTypeToType ty)
-            LMVectorLit lits -> Vector (map (llvmStaticToConstant . LlvmStaticLit) lits)
-            LMUndefLit       -> Undef VoidType
-      LMUninitType ty -> Undef (llvmTypeToType ty)
-      LMStaticStr str ty -> 
-      LMStaticArray stats ty -> Array (llvmTypeToType ty) (map llvmStaticToConstant stats)
-      LMStaticStruc stats ty -> Vector (map llvmStaticToConstant stats)
-      LMStaticPointer var -> undefined
+            Types.LMIntLit i width -> Int width i
+            Types.LMFloatLit d ty  -> Float (floatToSomeFloat d ty)
+            Types.LMNullLit ty     -> Null (llvmTypeToType ty)
+            Types.LMVectorLit lits -> Vector (map (llvmStaticToConstant . LlvmStaticLit) lits)
+            Types.LMUndefLit       -> Undef VoidType
+      Types.LMUninitType ty -> Undef (llvmTypeToType ty)
+      Types.LMStaticStr str ty -> undefined -- FIXME: Couldn't find an appropriate mapping
+      Types.LMStaticArray stats ty -> Array (llvmTypeToType ty) (map llvmStaticToConstant stats)
+      Types.LMStaticStruc stats ty -> Vector (map llvmStaticToConstant stats)
+      Types.LMStaticPointer var -> undefined
       -- static expressions
-      LMBitc stat ty -> BitCast (llvmStaticToConstant stat) (llvmTypeToType ty)
-      LMPtoI stat ty -> IntToPtr (llvmStaticToConstant stat) (llvmTypeToType ty)
-      LMAdd statL statR -> Add False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
-      LMSub statL statR -> Sub False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
+      Types.LMBitc stat ty -> BitCast (llvmStaticToConstant stat) (llvmTypeToType ty)
+      Types.LMPtoI stat ty -> IntToPtr (llvmStaticToConstant stat) (llvmTypeToType ty)
+      Types.LMAdd statL statR -> Add False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
+      Types.LMSub statL statR -> Sub False False (llvmStaticToConstant statL) (llvmStaticToConstant statR) -- bools are for no (un)signed wrap
 
-llvmCallConventionToCallingConvention :: LlvmCallConvention -> CallingConvention
+llvmCallConventionToCallingConvention :: LlvmCallConvention -> AST.CallingConvention
 llvmCallConventionToCallingConvention conv =
     case conv of
       CC_Ccc -> C
@@ -107,7 +107,7 @@ llvmCallConventionToCallingConvention conv =
       CC_X86_Stdcc -> Numbered 64
       CC_Ncc code -> Numbered code
 
-llvmFuncAttrToFunctionAttribute :: LlvmFuncAttr -> FunctionAttribute
+llvmFuncAttrToFunctionAttribute :: LlvmFuncAttr -> AST.FunctionAttribute
 llvmFuncAttrToFunctionAttribute attr =
     case attr of
       AlwaysInline -> AlwaysInline
@@ -124,7 +124,7 @@ llvmFuncAttrToFunctionAttribute attr =
       NoImplicitFloat -> NoImplicitFloat
       Naked -> Naked
 
-llvmParamAttrToParameterAttribute :: LlvmParamAttr -> ParameterAttribute
+llvmParamAttrToParameterAttribute :: LlvmParamAttr -> AST.ParameterAttribute
 llvmParamAttrToParameterAttribute attr =
     case attr of
       ZeroExt -> ZeroExt
@@ -136,14 +136,14 @@ llvmParamAttrToParameterAttribute attr =
       NoCapture -> NoCapture
       Nest -> Nest
 
-llvmCmpOpToPredicate :: LlvmCmpOp -> Either IntegerPredicate FloatingPointPredicate
+llvmCmpOpToPredicate :: LlvmCmpOp -> Either AST.IntegerPredicate AST.FloatingPointPredicate
 llvmCmpOpToPredicate op =
     let intOp = llvmCmpOpToIntegerPredicate op
         fpOp  = llvmCmpOpToFloatingPointPredicate op
     in if intOp /= Nothing then Left (fromJust intOp) else Right (fromJust fpOp)
 
 -- Convert comparator operators to integer predicates
-llvmCmpOpToIntegerPredicate :: LlvmCmpOp -> Maybe IntegerPredicate
+llvmCmpOpToIntegerPredicate :: LlvmCmpOp -> Maybe AST.IntegerPredicate
 llvmCmpOpToIntegerPredicate op =
     case op of
       LM_CMP_Eq  -> Just EQ
@@ -159,7 +159,7 @@ llvmCmpOpToIntegerPredicate op =
       _          -> Nothing
 
 -- The difference between O and U prefixed predicates relates to qNaN (quiet NaN) values
-llvmCmpOpToFloatingPointPredicate :: LlvmCmpOp -> FloatingPointPredicate
+llvmCmpOpToFloatingPointPredicate :: LlvmCmpOp -> AST.FloatingPointPredicate
 llvmCmpOpToFloatingPointPredicate op =
     case op of
       LM_CMP_Feq -> Just OEQ
@@ -171,16 +171,15 @@ llvmCmpOpToFloatingPointPredicate op =
       _          -> Nothing
 
 
-llvmVarToOperand :: LlvmVar -> Operand
+llvmVarToOperand :: LlvmVar -> AST.Operand
 llvmVarToOperand (LMGlobalVar str ty link sec ali con) = ConstantOperand (GlobalReference (mkName str))
--- N.B: Hashing a Unique technically doesn't guarantee a unique Int.
---      However, uniques are generated by the sequence Unique 1, Unique 2, ...
---      Thus we won't get any collisions until we call newUnique 2^32 or 2^64 times.
+-- Hashing a Unique technically doesn't guarantee a unique Int, but we won't get
+-- any collisions until 2^32 or 2^64 calls.
 llvmVarToOperand (LMLocalVar uniq ty) = LocalReference (UnName (hashUnique uniq))
 llvmVarToOperand (LMNLocalVar str ty) = LocalReference (mkName str)
 llvmVarToOperand (LMLitVar lit) = ConstantOperand (llvmStaticToConstant (LMStaticLit lit))
 
-llvmParameterToNamedParameter :: LlvmParameter -> Either String Word -> Parameter
+llvmParameterToNamedParameter :: LlvmParameter -> Either String Word -> AST.Parameter
 llvmParameterToNamedParameter (ty, attrs) name =
     Parameter ty' name' attrs'
         where attrs' = map llvmParamAttrToParameterAttribute attrs
@@ -188,12 +187,12 @@ llvmParameterToNamedParameter (ty, attrs) name =
               name' = either Name UnName name
 
 -- Can we get rid of the IO here?
-llvmParameterToParameter :: LlvmParameter -> IO Parameter
+llvmParameterToParameter :: LlvmParameter -> IO AST.Parameter
 llvmParameterToParameter param =
     do name <- newUnique
        llvmParameterToNamedParameter param (hashUnique name)
 
-platformToDataLayout :: Platform -> DataLayout
+platformToDataLayout :: Platform -> AST.DataLayout
 platformToDataLayout platform =
     case platform of
       Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
@@ -210,7 +209,7 @@ platformToDataLayout platform =
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 128 128),
                                                    ((AggregateAlign, 0), AlignmentInfo 0 64),
-                                                   ((FloatAlign, 80), AlignmentInfo 128 128)]
+                                                   ((FloatAlign, 80), AlignmentInfo 128 128)],
                        nativeSizes = Just (Set.FromList [8, 16, 32])
                      }
       Platform { platformArch = ArchX86, platformOS = OSMinGW32 } ->
@@ -226,8 +225,9 @@ platformToDataLayout platform =
                                                    ((FloatAlign, 64), AlignmentInfo 32 64),
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 128 128),
-                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
-                                                   --n.b. original data layout (erroneously?) had 2 values for f64, 128:128 and 32:32. Going with 32:32 for now.
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64),
+                                                   --n.b. original data layout (erroneously?) had 2 values for f64, 
+                                                   -- 128:128 and 32:32. Going with 32:32 for now.
                                                    ((FloatAlign, 80), AlignmentInfo 32 32)],
                        nativeSizes = Just (Set.FromList [8, 16, 32])
                      }
@@ -297,7 +297,7 @@ platformToDataLayout platform =
                                                    ((FloatAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 64 128),
-                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
                        nativeSizes = Just (Set.FromList [32])
                      }
       Platform { platformArch = ArchARM {}, platformOS = OSAndroid } ->
@@ -313,7 +313,7 @@ platformToDataLayout platform =
                                                    ((FloatAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 64 128),
-                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
                        nativeSizes = Just (Set.FromList [32])
                      }
       Platform { platformArch = ArchARM {}, platformOS = OSQNXNTO } ->
@@ -329,7 +329,7 @@ platformToDataLayout platform =
                                                    ((FloatAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 64 128),
-                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
                        nativeSizes = Just (Set.FromList [32])
                      }
       Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
@@ -345,13 +345,14 @@ platformToDataLayout platform =
                                                    ((FloatAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 64), AlignmentInfo 64 64),
                                                    ((VectorAlign, 128), AlignmentInfo 64 128),
-                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)]
+                                                   ((AggregateAlign, 0), AlignmentInfo 0 64)],
                        nativeSizes = Just (Set.FromList [32])
                      }
       _ ->
           defaultDataLayout
 
 platformToTargetTriple :: Platform -> String
+platformToTargetTriple platform =
     case platform of
     Platform { platformArch = ArchX86, platformOS = OSDarwin } ->
         "i386-apple-darwin9.8"
@@ -374,22 +375,22 @@ platformToTargetTriple :: Platform -> String
     _ ->
         ""
 
-llvmVarToName :: LlvmVar -> Name
+llvmVarToName :: LlvmVar -> AST.Name
 llvmVarToName (LMGlobalVar name ty link sec ali con) = Name name
 llvmVarToName (LMLocalVar uniq ty) = UnName uniq
 llvmVarToName (LMNLocalVar name ty) = Name name
 llvmVarToName _ = error "llvmVarToName: not a valid name"
 
-llvmVarToConstant :: LlvmVar -> Constant
+llvmVarToConstant :: LlvmVar -> AST.Constant
 llvmVarToConstant v@(LMGlobalVar name ty link sec ali con) = GlobalReference (llvmVarToName v)
-llvmVarToConstant v@(LMLocalVar uniq ty) = 
+llvmVarToConstant v@(LMLocalVar uniq ty) = undefined -- FIXME 
 llvmVarToConstant v@(LMNLocalVar str ty) = undefined
 llvmVarToConstant v@(LMLitVar lit) = undefined
 
-mkName :: LMString -> Name
+mkName :: LMString -> AST.Name
 mkName = Name . unpackFS
 
-metaExprToMetadataNode :: MetaExpr -> MetadataNode
+metaExprToMetadataNode :: MetaExpr -> AST.MetadataNode
 metaExprToMetadataNode (MetaStr    s ) =
     MetadataNode [MetadataStringOperand (unpackFS s)]
 metaExprToMetadataNode (MetaNode   n ) =
@@ -406,7 +407,7 @@ metaExprToMetadataNode (MetaVar    v ) =
 metaExprToMetadataNode (MetaStruct es) =
     MetadataNode $ map (Just . outputLlvmMetaExpr) es
 
-llvmLitToConstant :: LlvmLit -> Constant
+llvmLitToConstant :: LlvmLit -> AST.Constant
 llvmLitToConstant lit =
     case lit of
       LMIntLit i ty -> Int (llvmWidthInBits dFlags ty) i
@@ -415,14 +416,14 @@ llvmLitToConstant lit =
       LMVectorLit lits -> Vector (map llvmLitToConstant lits)
       LMUndefLit ty -> Undef (llvmTypeToType ty)
 
-llvmExpressionToConstant :: LlvmExpression -> Constant
+llvmExpressionToConstant :: LlvmExpression -> AST.Constant
 llvmExpressionToConstant expr =
     case expr of
       Alloca     tp amount          -> undefined
       LlvmOp     op left right      -> llvmOpToConstant op left right
       Call       tp fp args attrs   -> undefined
       CallM      tp fp args attrs   -> undefined
-      Cast       LM_Bitcast from to -> BitCast (llvmVarToConstant from) (llvmTypeToType to)
+      Cast       LM_Bitcast from to -> AST.BitCast (llvmVarToConstant from) (llvmTypeToType to)
       Cast       _ from to          -> undefined
       Compare    op left right      -> llvmCompareToConstant op left right
       Extract    vec idx            -> llvmExtractToConstant vec idx
@@ -434,7 +435,7 @@ llvmExpressionToConstant expr =
       Asm        asm c ty v se sk   -> undefined
       MExpr      meta e             -> undefined
 
-llvmCompareToConstant :: LlvmCmpOp -> LlvmVar -> LlvmVar -> Constant
+llvmCompareToConstant :: LlvmCmpOp -> LlvmVar -> LlvmVar -> AST.Constant
 llvmCompareToConstant op left right =
     case op' of
       Right iOp -> ICmp iOp l r
@@ -443,38 +444,38 @@ llvmCompareToConstant op left right =
           l = llvmVarToConstant left
           r = llvmVarToConstant right
 
-llvmExtractToConstant :: LlvmVar -> LlvmVar -> Constant
+llvmExtractToConstant :: LlvmVar -> LlvmVar -> AST.Constant
 llvmExtractToConstant vec idx =
     ExtractElement (llvmVarToConstant vec) (llvmVarToConstant idx)
 
-llvmInsertToConstant :: LlvmVar -> LlvmVar -> LlvmVar -> Constant
+llvmInsertToConstant :: LlvmVar -> LlvmVar -> LlvmVar -> AST.Constant
 llvmInsertToConstant vec elt idx =
     InsertElement (llvmVarToConstant vec) (llvmVarToConstant elt) (llvmVarToConstant idx)
 
-llvmGetElemPtrToConstant :: Bool -> LlvmVar -> [LlvmVar] -> Constant
+llvmGetElemPtrToConstant :: Bool -> LlvmVar -> [LlvmVar] -> AST.Constant
 llvmGetElemPtrToConstant inb ptr indexes =
     GetElementPtr inb (llvmVarToConstant ptr) (map llvmVarToConstant indexes)
 
-llvmOpToConstant :: LlvmMachOp -> LlvmVar -> LlvmVar -> Constant
+llvmOpToConstant :: LlvmMachOp -> LlvmVar -> LlvmVar -> AST.Constant
 llvmOpToConstant op left right =
+    let left' = llvmVarToConstant left
+        right' = llvmVarToConstant right in
     case op of
-       (LM_MO_Add  -> Add False False
-        LM_MO_Sub  -> Sub False False
-        LM_MO_Mul  -> Mul False False
-        LM_MO_UDiv -> UDiv False
-        LM_MO_SDiv -> SDiv False
-        LM_MO_URem -> URem
-        LM_MO_SRem -> SRem
-        LM_MO_FAdd -> FAdd
-        LM_MO_FSub -> FSub
-        LM_MO_FMul -> FMul
-        LM_MO_FDiv -> FDiv
-        LM_MO_FRem -> FRem
-        LM_MO_Shl  -> Shl False False
-        LM_MO_LShr -> LShr False
-        LM_MO_AShr -> AShr False
-        LM_MO_And  -> And
-        LM_MO_Or   -> Or
-        LM_MO_Xor  -> Xor) $ left' right'
-           where left' = llvmVarToConstant left
-                 right' = llvmVarToConstant right
+       LM_MO_Add  -> Add False False left' right'
+       LM_MO_Sub  -> Sub False False left' right'
+       LM_MO_Mul  -> Mul False False left' right'
+       LM_MO_UDiv -> UDiv False left' right'
+       LM_MO_SDiv -> SDiv False left' right'
+       LM_MO_URem -> URem left' right'
+       LM_MO_SRem -> SRem left' right'
+       LM_MO_FAdd -> FAdd left' right'
+       LM_MO_FSub -> FSub left' right'
+       LM_MO_FMul -> FMul left' right'
+       LM_MO_FDiv -> FDiv left' right'
+       LM_MO_FRem -> FRem left' right'
+       LM_MO_Shl  -> Shl False False left' right'
+       LM_MO_LShr -> LShr False left' right'
+       LM_MO_AShr -> AShr False left' right'
+       LM_MO_And  -> And left' right'
+       LM_MO_Or   -> Or left' right'
+       LM_MO_Xor  -> Xor left' right'

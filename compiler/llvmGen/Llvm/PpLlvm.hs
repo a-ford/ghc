@@ -5,9 +5,9 @@
 module Llvm.PpLlvm (
 
     -- * Top level LLVM objects.
---    ppLlvmModule,
---    ppLlvmComments,
---    ppLlvmComment,
+    ppLlvmModule,
+    ppLlvmComments,
+    ppLlvmComment,
     ppLlvmGlobals,
     ppLlvmGlobal,
     ppLlvmAliases,

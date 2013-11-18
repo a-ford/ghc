@@ -545,9 +545,9 @@ endif
 # The .hsc files aren't currently safe for cross-compilation on Windows:
 #     libraries\haskeline\.\System\Console\Haskeline\Backend\Win32.hsc:160
 #     directive "let" is not safe for cross-compilation
-ifneq "$(Windows_Host)" "YES"
-SRC_HSC2HS_OPTS += --cross-safe
-endif
+#ifneq "$(Windows_Host)" "YES"
+#SRC_HSC2HS_OPTS += --cross-safe
+#endif
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 
 define set_stage_HSC2HS_OPTS

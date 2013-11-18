@@ -11,6 +11,7 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
 import LlvmCodeGen.Ppr
+import LlvmCodeGen.Output
 import LlvmCodeGen.Regs
 import LlvmMangler
 

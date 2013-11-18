@@ -388,15 +388,8 @@ else
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 
-PACKAGES_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl transformers
-
-PACKAGES_STAGE0 += text
-PACKAGES_STAGE0 += mtl
-PACKAGES_STAGE0 += parsec
-PACKAGES_STAGE0 += setenv
-PACKAGES_STAGE0 += utf8-string
-PACKAGES_STAGE0 += llvm-general-pure
-PACKAGES_STAGE0 += llvm-general
+PACKAGES_STAGE0 = Cabal/Cabal hpc bin-package-db hoopl
+# transformers
 
 ifeq "$(Windows_Host)" "NO"
 ifneq "$(HostOS_CPP)" "ios"
@@ -433,8 +426,9 @@ PACKAGES_STAGE1 += bin-package-db
 PACKAGES_STAGE1 += hoopl
 PACKAGES_STAGE1 += transformers
 
-PACKAGES_STAGE1 += text
+# new
 PACKAGES_STAGE1 += mtl
+PACKAGES_STAGE1 += text
 PACKAGES_STAGE1 += parsec
 PACKAGES_STAGE1 += setenv
 PACKAGES_STAGE1 += utf8-string
