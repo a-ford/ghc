@@ -57,10 +57,29 @@ data LlvmType
   -- | Function type, used to create pointers to functions
   | LMFunction LlvmFunctionDecl
   deriving (Eq)
-{-
-instance LLVMOutputable LlvmType where
-  toLlvm (LMInt size) = LLVM.Core.
--}
+
+-- FIX THIS!!------------------------------------------
+-- Make params showable
+-- | Shown types are not neccessarily pretty
+instance Show LlvmType where
+  show (LMInt size     ) = "i" ++ show size
+  show (LMFloat        ) = "float"
+  show (LMDouble       ) = "double"
+  show (LMFloat80      ) = "x86_fp80"
+  show (LMFloat128     ) = "fp128"
+  show (LMPointer x    ) = show x ++ "*"
+  show (LMArray nr tp  ) = "[" ++ show ++ "x" ++ show tp ++ "]"
+  show (LMVector nr tp ) = "<" ++ show ++ "x" ++ show tp ++ ">"
+  show (LMLabel        ) = "label"
+  show (LMVoid         ) = "void"
+  show (LMStruct tys   ) = "<{" ++ (concat . map show) tys <> text "}>"
+  show (LMMetadata     ) = "metadata"
+
+  show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
+    = show r ++ "(" ++ ++ ppParams varg p <> rparen
+
+  show (LMAlias (s,_)) = char '%' <> ftext s
+
 instance Outputable LlvmType where
   ppr (LMInt size     ) = char 'i' <> ppr size
   ppr (LMFloat        ) = text "float"
