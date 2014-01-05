@@ -7,6 +7,8 @@ module LlvmCodeGen ( llvmCodeGen, llvmFixupAsm ) where
 #include "HsVersions.h"
 
 import Llvm
+import Llvm.CodeOutput
+import Llvm.TypeConversions
 import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
@@ -26,6 +28,7 @@ import ErrUtils
 import FastString
 import Outputable
 import UniqSupply
+import Platform
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
@@ -69,8 +72,9 @@ llvmCodeGen dflags filenm us cmm_stream
        runLlvm dflags ver bufh us $
          llvmCodeGen' (targetPlatform dflags) (liftStream cmm_stream)
 
+       m <- getEnvModule
        -- write bitcode to file
-       writeBitcodeToFile filenm (envModule getEnv)
+       writeBitcodeToFile filenm m
 
 --       bFlush bufh
 

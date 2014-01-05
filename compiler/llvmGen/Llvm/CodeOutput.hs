@@ -54,7 +54,7 @@ outputLlvmGlobal (LMGlobal var@(LMGlobalVar name ty link sec ali con) dat) =
        G.isConstant = (con == Constant),
        G.type' = (llvmTypeToType ty),
        G.initializer = dat >>= (Just . llvmStaticToConstant),
-       G.section = sec,
+       G.section = (Just . unpackFS) =<< sec,
        G.alignment = if ali==Nothing then 0 else (fromIntegral . fromJust) ali
     })
     where varGlobal = llvmVarToGlobal var
@@ -91,8 +91,8 @@ outputLlvmMetaExpr = metaExprToOperand
 -- Make params showable, then stitch together the function name, param
 -- (e.g. type and attrs), position in param list. Hopefully enough
 -- identifying info for uniqueness, at least within a module.
-parameterName :: LMString -> LlvmParameter -> String
-parameterName fname (ty, attrs) = (unpackFS fname) ++ 
+--parameterName :: LMString -> LlvmParameter -> String
+--parameterName fname (ty, attrs) = (unpackFS fname) ++ 
 
 -- | Output out a list of function definitions.
 outputLlvmFunctions :: LlvmFunctions -> [Definition]
@@ -108,14 +108,20 @@ outputLlvmFunction (LlvmFunction dec@(LlvmFunctionDecl name link cc retTy vArgs 
         G.callingConvention = llvmCallConventionToCallingConvention cc,
         G.returnType = llvmTypeToType retTy,
         G.name = mkName name,
-        G.parameters = ((concat . map llvmParameterToNamedParameter) params, vArgs==VarArgs),
+        G.parameters = (parameters, vArgs == VarArgs),
         G.functionAttributes = map llvmFuncAttrToFunctionAttribute attrs,
-        G.section = sec,
+        G.section = (Just . unpackFS) =<< sec,
         G.alignment = ali',
         G.basicBlocks = outputLlvmBlocks body
       }
       where ali' = fromIntegral (if ali==Nothing then 0 else fromJust ali)
-            pnames = 
+            {- llvmParameterToNamedParameter takes an Either String Word, so we
+               need to use the Left constructor
+               To name the parameters, just throw in as much context as we can get:
+                Function name, parameter index, parameter type and attributes -}
+            pnames = zipWith (\i p ->  Left (i++(unpackFS name)++(show p)))
+                       (map show [0..]) params
+            parameters = zipWith llvmParameterToNamedParameter params pnames
 
 {-
 -- | Output out a function defenition header.
@@ -154,8 +160,8 @@ outputLlvmBlock :: LlvmBlock -> BasicBlock
 outputLlvmBlock (LlvmBlock blockId stmts) =
     BasicBlock name instrs (head terminator)
         where
-          name = UnName (getKey (fromIntegral blockId))
-          -- terminator should really be a singleton list here
+          name = UnName (fromIntegral (getKey blockId))
+          -- terminator had better be a singleton list here
           (instrs, terminator) = partitionEithers (map outputLlvmStatement stmts)
 
 {-  let isLabel (MkLabel _) = True
@@ -194,7 +200,7 @@ outputMetaStatement meta stmt =
       AbsSyn.Switch scrut def tgs -> Right $ outputSwitch scrut def tgs meta  -- Terminator
       Return      result        -> Right $ outputReturn result meta         -- Terminator
       Expr        expr          -> Left $ outputMetaExpr meta expr          -- Instruction
-      AbsSyn.Unreachable        -> Right $ AST.Unreachable meta                 -- Terminator
+      AbsSyn.Unreachable        -> Right $ Do (AST.Unreachable (outputMetaAnnots meta)) -- Terminator
       Nop                       -> undefined
       MetaStmt    meta s        -> outputMetaStatement meta s
 
@@ -220,7 +226,8 @@ outputMetaExpr meta expr =
       AbsSyn.Load       ptr              -> outputLoad ptr meta
       Malloc     tp amount        -> outputMalloc tp amount meta
       AbsSyn.Phi        tp precessors    -> outputPhi tp precessors meta
-      Asm        asm c ty v se sk -> outputAsm asm c ty v se sk
+--      Asm        asm c ty v se sk -> outputAsm asm c ty v se sk
+      Asm        asm c ty v se sk -> undefined -- Undefined temporarily, need to sort out types
       MExpr      meta e           -> outputMetaExpr meta e
 
 --------------------------------------------------------------------------------
@@ -240,30 +247,30 @@ outputCall ct (LMGlobalVar _ (LMFunction decl@(LlvmFunctionDecl name _ cc _ vArg
                 metadata = outputMetaAnnots metas
               }
     where pattrs = map (map llvmParamAttrToParameterAttribute . snd) params
-          args' = map outputMetaExpr outputLlvmMachOp
+          args' = map outputLlvmMetaExpr args
 
 outputLlvmMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> [MetaAnnot] -> Named Instruction
 outputLlvmMachOp op left right metas =
     Do $
        (case op of
-          LM_MO_Add  -> Add False False
-          LM_MO_Sub  -> Sub False False
-          LM_MO_Mul  -> Mul False False
-          LM_MO_UDiv -> UDiv False
-          LM_MO_SDiv -> SDiv False
-          LM_MO_URem -> URem
-          LM_MO_SRem -> SRem
-          LM_MO_FAdd -> FAdd
-          LM_MO_FSub -> FSub
-          LM_MO_FMul -> FMul
-          LM_MO_FDiv -> FDiv
-          LM_MO_FRem -> FRem
-          LM_MO_Shl  -> Shl False False
-          LM_MO_LShr -> LShr False
-          LM_MO_AShr -> AShr False
-          LM_MO_And  -> And
-          LM_MO_Or   -> Or
-          LM_MO_Xor  -> Xor) $ left' right' metas'
+          LM_MO_Add  -> Add False False left' right' metas'
+          LM_MO_Sub  -> Sub False False left' right' metas'
+          LM_MO_Mul  -> Mul False False left' right' metas'
+          LM_MO_UDiv -> UDiv False left' right' metas'
+          LM_MO_SDiv -> SDiv False left' right' metas'
+          LM_MO_URem -> URem left' right' metas'
+          LM_MO_SRem -> SRem left' right' metas'
+          LM_MO_FAdd -> FAdd left' right' metas'
+          LM_MO_FSub -> FSub left' right' metas'
+          LM_MO_FMul -> FMul left' right' metas'
+          LM_MO_FDiv -> FDiv left' right' metas'
+          LM_MO_FRem -> FRem left' right' metas'
+          LM_MO_Shl  -> Shl False False left' right' metas'
+          LM_MO_LShr -> LShr False left' right' metas'
+          LM_MO_AShr -> AShr False left' right' metas'
+          LM_MO_And  -> And left' right' metas'
+          LM_MO_Or   -> Or left' right' metas'
+          LM_MO_Xor  -> Xor left' right' metas')
                 where left' = llvmVarToOperand left
                       right' = llvmVarToOperand right
                       metas' = outputMetaAnnots metas
@@ -278,9 +285,10 @@ outputCmpOp op left right metas = Do $ ICmp iPred left' right' metas'
 
 -- | Not completely sure what an assignment should be in the context of a SSA
 -- | based representation.
+-- The name doesn't get used, this is certainly wrong.
 outputAssignment :: LlvmVar -> LlvmExpression -> [MetaAnnot] -> Named Instruction
-outputAssignment var expr metas =
-    (llvmVarToName var) := (outputLlvmExpression (MExpr expr metas))
+outputAssignment var expr metas = outputLlvmExpression (MExpr metas expr)
+--    (llvmVarToName var) := (outputLlvmExpression (MExpr metas expr))
 
 {-    case var of
       LMGlobalVar name ty link sec ali con ->  := 
@@ -333,45 +341,47 @@ outputStore val dst metas
     metas' = outputMetaAnnots metas
 
 outputCast :: LlvmCastOp -> LlvmVar -> LlvmType -> [MetaAnnot] -> Named Instruction
-outputCast op var ty metas = Do $
-    (case op of
-      LM_Trunc    -> Trunc
-      LM_Zext     -> ZExt
-      LM_Sext     -> SExt
-      LM_Fptrunc  -> FPTrunc
-      LM_Fpext    -> FPToUI
-      LM_Fptoui   -> FPToUI
-      LM_Fptosi   -> FPToSI
-      LM_Uitofp   -> UIToFP
-      LM_Sitofp   -> SIToFP
-      LM_Ptrtoint -> PtrToInt
-      LM_Inttoptr -> IntToPtr
-      LM_Bitcast  -> BitCast)
-             $ (llvmVarToOperand op) (llvmTypeToType ty) (outputMetaAnnots metas)
+outputCast op var ty metas = 
+    Do $ (case op of
+            LM_Trunc    -> Trunc operand ty' metas'
+            LM_Zext     -> ZExt operand ty' metas'
+            LM_Sext     -> SExt operand ty' metas'
+            LM_Fptrunc  -> FPTrunc operand ty' metas'
+            LM_Fpext    -> FPToUI operand ty' metas'
+            LM_Fptoui   -> FPToUI operand ty' metas'
+            LM_Fptosi   -> FPToSI operand ty' metas'
+            LM_Uitofp   -> UIToFP operand ty' metas'
+            LM_Sitofp   -> SIToFP operand ty' metas'
+            LM_Ptrtoint -> PtrToInt operand ty' metas'
+            LM_Inttoptr -> IntToPtr operand ty' metas'
+            LM_Bitcast  -> BitCast operand ty' metas')
+           where operand = llvmVarToOperand var
+                 ty' = llvmTypeToType ty
+                 metas' = outputMetaAnnots metas
 
 -- As of LLVM 3.0, malloc is no longer an instruction of the LLVM IR.
 -- One solution to deal with this is to call the @malloc function instead. It may also be possible
 -- to replace it with alloca instruction(s), or just not generate mallocs in the first place.
 -- I think we can get away without generating these in the first place.
-outputMalloc :: LlvmType -> Int -> Named Instruction --'done'
-outputMalloc tp amount = undefined
+outputMalloc :: LlvmType -> Int -> [MetaAnnot] -> Named Instruction --'done'
+outputMalloc tp amount metas = undefined
 
 -- Must specify a width for the amount of memory requested, assume a 64 bit quantity.
 outputAlloca :: LlvmType -> Int -> [MetaAnnot] -> Named Instruction
-outputAlloca ty amount metas = Do $ AST.Alloca ty' con 0 metas'
+outputAlloca ty amount metas = Do $ AST.Alloca ty' (Just con) 0 metas'
     where ty' = llvmTypeToType ty
-          con = ConstantOperand (C.Int 64 amount)
+          con = ConstantOperand (C.Int 64 (fromIntegral amount))
           metas' = outputMetaAnnots metas
 
 outputGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> [MetaAnnot] -> Named Instruction
 outputGetElementPtr inb ptr idx metas = Do $ GetElementPtr inb ptr' idx' metas'
     where ptr' = llvmVarToOperand ptr
-          idx' = llvmVarToOperand idx
+          idx' = map llvmVarToOperand idx
           metas' = outputMetaAnnots metas
 
 outputReturn :: Maybe LlvmVar -> [MetaAnnot] -> Named Terminator
 outputReturn var metas = Do $ Ret var' metas'
-    where var' = llvmVarToOperand =<< var
+    where var' = (Just . llvmVarToOperand) =<< var
           metas' = outputMetaAnnots metas
 
 -- Unconditional branch to target
@@ -426,8 +436,8 @@ outputInsert vec elt idx metas = Do $ InsertElement vec' elt' idx' metas'
           idx' = llvmVarToOperand idx
           metas' = outputMetaAnnots metas
 
-outputMetaAnnots :: [MetaAnnot] -> [InstructionMetadata]
-outputMetaAnnots metas = map outputMetaAnnot metas
+outputMetaAnnots :: [MetaAnnot] -> InstructionMetadata
+outputMetaAnnots metas = (concat . map outputMetaAnnot) metas
 
 outputMetaAnnot :: MetaAnnot -> InstructionMetadata
-outputMetaAnnot (MetaAnnot str expr) = (unpackFS str, metaExprToMetadataNode expr)
+outputMetaAnnot (MetaAnnot str expr) = [(unpackFS str, metaExprToMetadataNode expr)]

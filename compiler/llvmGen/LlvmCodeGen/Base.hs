@@ -488,4 +488,3 @@ generateAliases = do
 -- | Error function
 panic :: String -> a
 panic s = Outp.panic $ "LlvmCodeGen.Base." ++ s
-

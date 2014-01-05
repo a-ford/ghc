@@ -58,8 +58,6 @@ data LlvmType
   | LMFunction LlvmFunctionDecl
   deriving (Eq)
 
--- FIX THIS!!------------------------------------------
--- Make params showable
 -- | Shown types are not neccessarily pretty
 instance Show LlvmType where
   show (LMInt size     ) = "i" ++ show size
@@ -68,17 +66,17 @@ instance Show LlvmType where
   show (LMFloat80      ) = "x86_fp80"
   show (LMFloat128     ) = "fp128"
   show (LMPointer x    ) = show x ++ "*"
-  show (LMArray nr tp  ) = "[" ++ show ++ "x" ++ show tp ++ "]"
-  show (LMVector nr tp ) = "<" ++ show ++ "x" ++ show tp ++ ">"
+  show (LMArray nr tp  ) = "[" ++ show nr ++ "x" ++ show tp ++ "]"
+  show (LMVector nr tp ) = "<" ++ show nr ++ "x" ++ show tp ++ ">"
   show (LMLabel        ) = "label"
   show (LMVoid         ) = "void"
-  show (LMStruct tys   ) = "<{" ++ (concat . map show) tys <> text "}>"
+  show (LMStruct tys   ) = "<{" ++ (concat . map show) tys ++ "}>"
   show (LMMetadata     ) = "metadata"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
-    = show r ++ "(" ++ ++ ppParams varg p <> rparen
+    = show r ++ "(" ++ (concat . map show) p ++ ")" -- ignore vararg distinction
 
-  show (LMAlias (s,_)) = char '%' <> ftext s
+  show (LMAlias (s,_)) = "%"  ++ unpackFS s
 
 instance Outputable LlvmType where
   ppr (LMInt size     ) = char 'i' <> ppr size
@@ -110,8 +108,8 @@ ppParams varg p
     in ppCommaJoin args <> ptext varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
---type LMSection = Maybe LMString
-type LMSection = Maybe String
+type LMSection = Maybe LMString
+--type LMSection = Maybe String
 type LMAlign = Maybe Int
 
 data LMConst = Global      -- ^ Mutable global variable
@@ -450,6 +448,16 @@ instance Outputable LlvmParamAttr where
   ppr NoAlias   = text "noalias"
   ppr NoCapture = text "nocapture"
   ppr Nest      = text "nest"
+
+instance Show LlvmParamAttr where
+  show ZeroExt   = "zeroext"
+  show SignExt   = "signext"
+  show InReg     = "inreg"
+  show ByVal     = "byval"
+  show SRet      = "sret"
+  show NoAlias   = "noalias"
+  show NoCapture = "nocapture"
+  show Nest      = "nest"
 
 -- | Llvm Function Attributes.
 --

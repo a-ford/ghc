@@ -9,6 +9,7 @@ module LlvmCodeGen.Output (
 #include "HsVersions.h"
 
 import Llvm
+import Llvm.CodeOutput
 import LlvmCodeGen.Base
 import LlvmCodeGen.Data
 
@@ -54,12 +55,12 @@ outputLlvmCmmDecl count (CmmProc mb_info entry_lbl live (ListGraph blks))
            link = if externallyVisibleCLabel lbl'
                       then ExternallyVisible
                       else Internal
-           lmblocks = map (\(BasicBlock id stmts) ->
+           lmblocks = map (\(Cmm.BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
 
        fun <- mkLlvmFunc live lbl' link  sec' lmblocks
 
-       return (idoc ++ (outputLlvmFunction fun), ivar)
+       return ((outputLlvmFunction fun):idoc, ivar)
 
 -- | Output CmmStatic
 outputInfoTable :: Int -> CLabel -> CmmStatics -> LlvmM ([Definition], [LlvmVar])

@@ -59,7 +59,7 @@ llvmVarToGlobal (LMGlobalVar str ty link sec ali con) =
            G.isConstant = (con == Constant),
            G.type' = (llvmTypeToType ty),
            G.initializer = Nothing,
-           G.section = sec,
+           G.section = (Just . unpackFS) =<< sec,
            G.alignment = if ali==Nothing then 0 else (fromIntegral . fromJust) ali
          }
 llvmVarToGlobal (LMLocalVar uniq ty) = undefined
