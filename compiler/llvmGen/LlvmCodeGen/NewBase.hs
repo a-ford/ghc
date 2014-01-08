@@ -4,7 +4,7 @@
 -- Contains functions useful through out the code generator.
 --
 
-module LlvmCodeGen.OldBase (
+module LlvmCodeGen.NewBase (
 
         LlvmCmmDecl, LlvmBasicBlock,
         LiveGlobalRegs,
@@ -37,6 +37,8 @@ module LlvmCodeGen.OldBase (
 
 import Llvm
 import LlvmCodeGen.Regs
+import Llvm.CodeOutput
+import Llvm.TypeConversions
 
 import CLabel
 import CodeGen.Platform ( activeStgRegs )
@@ -54,53 +56,62 @@ import UniqSupply
 import ErrUtils
 import qualified Stream
 
-import LLVM.General
+import LLVM.General.AST
+import LLVM.General.AST.Constant
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
 --
 
-type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
-type LlvmBasicBlock = GenBasicBlock LlvmStatement
+--type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
+type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph Statement)
+--type LlvmBasicBlock = GenBasicBlock LlvmStatement
+type LlvmBasicBlock = GenBasicBlock Terminator
 
 -- | Global registers live on proc entry
 type LiveGlobalRegs = [GlobalReg]
 
 -- | Unresolved code.
 -- Of the form: (data label, data type, unresolved data)
-type LlvmUnresData = (CLabel, Section, LlvmType, [UnresStatic])
+--type LlvmUnresData = (CLabel, Section, LlvmType, [UnresStatic])
+type LlvmUnresData = (CLabel, Section, Type, [UnresStatic])
 
 -- | Top level LLVM Data (globals and type aliases)
-type LlvmData = ([LMGlobal], [LlvmType])
+--type LlvmData = ([LMGlobal], [LlvmType])
+type LlvmData = ([Definition], [Type])
 
 -- | An unresolved Label.
 --
 -- Labels are unresolved when we haven't yet determined if they are defined in
 -- the module we are currently compiling, or an external one.
 type UnresLabel  = CmmLit
-type UnresStatic = Either UnresLabel LlvmStatic
+--type UnresStatic = Either UnresLabel LlvmStatic
+type UnresStatic = Either UnresLabel Constant
+
+-- | Fully qualified Llvm statements
+type Statement = (Named (Either Instruction Terminator))
 
 -- ----------------------------------------------------------------------------
 -- * Type translations
 --
 
--- | Translate a basic CmmType to an LlvmType.
-cmmToLlvmType :: CmmType -> LlvmType
-cmmToLlvmType ty | isVecType ty   = LMVector (vecLength ty) (cmmToLlvmType (vecElemType ty))
+-- | Translate a basic CmmType to an Llvm Type.
+cmmToLlvmType :: CmmType -> Type
+cmmToLlvmType ty | isVecType ty   = VectorType (fromIntegral ty) (cmmToLlvmType (vecElemType ty))
                  | isFloatType ty = widthToLlvmFloat $ typeWidth ty
                  | otherwise      = widthToLlvmInt   $ typeWidth ty
 
--- | Translate a Cmm Float Width to a LlvmType.
-widthToLlvmFloat :: Width -> LlvmType
-widthToLlvmFloat W32  = LMFloat
-widthToLlvmFloat W64  = LMDouble
-widthToLlvmFloat W80  = LMFloat80
-widthToLlvmFloat W128 = LMFloat128
+-- | Translate a Cmm Float Width to a Llvm Type.
+widthToLlvmFloat :: Width -> Type
+widthToLlvmFloat W32  = FloatingPointType 32 IEEE
+widthToLlvmFloat W64  = FloatingPointType 64 IEEE
+widthToLlvmFloat W80  = FloatingPointType 80 DoubleExtended
+widthToLlvmFloat W128 = FloatingPointType 128 IEEE
 widthToLlvmFloat w    = panic $ "widthToLlvmFloat: Bad float size: " ++ show w
 
--- | Translate a Cmm Bit Width to a LlvmType.
-widthToLlvmInt :: Width -> LlvmType
-widthToLlvmInt w = LMInt $ widthInBits w
+-- | Translate a Cmm Bit Width to a Llvm Type.
+widthToLlvmInt :: Width -> Type
+widthToLlvmInt w = IntegerType $ (fromIntegral w)
 
 -- | GHC Call Convention for LLVM
 llvmGhcCC :: DynFlags -> LlvmCallConvention
@@ -109,8 +120,8 @@ llvmGhcCC dflags
  | otherwise                                      = CC_Ncc 10
 
 -- | Llvm Function type for Cmm function
-llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
-llvmFunTy live = return . LMFunction =<< llvmFunSig' live (fsLit "a") ExternallyVisible
+llvmFunTy :: LiveGlobalRegs -> LlvmM Type
+llvmFunTy live = (return . llvmTypeToType . LMFunction) =<< llvmFunSig' live (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
 llvmFunSig :: LiveGlobalRegs ->  CLabel -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
@@ -326,11 +337,11 @@ renderLlvm sdoc = do
 
 -- | Add a definition to a given module
 appendDefinitions :: Module -> [Definition] -> Module
-appendDefinitions mod defs = mod {moduleDefinitions =  (moduleDefintions mod) ++ defs}
+appendDefinitions mod defs = mod {moduleDefinitions =  (moduleDefinitions mod) ++ defs}
 
 -- | Add a definition to the llvm module.
 outputLlvm :: [Definition] -> LlvmM ()
-outputLlvm defs = modifyEnv $ \env -> env {envModule = appendDefinitions envModule defs}
+outputLlvm defs = modifyEnv $ \env -> env {envModule = appendDefinitions (envModule env) defs}
 
 -- | Run a @UniqSM@ action with our unique supply
 runUs :: UniqSM a -> LlvmM a
@@ -466,7 +477,7 @@ generateAliases = do
                          LMGlobal aliasVar $ Just $ LMStaticPointer (var i8) ]
   -- Reset forward list
   modifyEnv $ \env -> env { envAliases = emptyUniqSet }
-  return (concat defss, [])
+  return (outputLlvmGlobals (concat defss), [])
 
 -- Note [Llvm Forward References]
 --
@@ -488,3 +499,4 @@ generateAliases = do
 -- | Error function
 panic :: String -> a
 panic s = Outp.panic $ "LlvmCodeGen.Base." ++ s
+

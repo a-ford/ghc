@@ -38,14 +38,15 @@ import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
 import LLVM.General
+import LLVM.General.AST
 
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> FilePath -> UniqSupply
+llvmCodeGen :: DynFlags -> Handle -> UniqSupply
                -> Stream.Stream IO RawCmmGroup ()
                -> IO ()
-llvmCodeGen dflags filenm us cmm_stream
+llvmCodeGen dflags h us cmm_stream
   = do bufh <- newBufHandle h
 
        -- Pass header
@@ -72,21 +73,19 @@ llvmCodeGen dflags filenm us cmm_stream
        runLlvm dflags ver bufh us $
          llvmCodeGen' (targetPlatform dflags) (liftStream cmm_stream)
 
-       m <- getEnvModule
        -- write bitcode to file
-       writeBitcodeToFile filenm m
+       --writeBitcodeToFile filenm m
 
---       bFlush bufh
+       bFlush bufh
 
 llvmCodeGen' :: Platform -> Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
 llvmCodeGen' platform cmm_stream = do
   -- Preamble
   -- Set the data layout and target
-  let dl = platformToDataLayout platform
-  let tt = platformToTargetTriple platform
-  modifyEnv (\env -> env {envModule = envModule env {moduleDataLayout = dl,
-                                                     moduleTargetTriple = tt}})
-
+  let dl = Just $ platformToDataLayout platform
+  let tt = Just $ platformToTargetTriple platform
+  modifyModule (\mod -> mod {moduleDataLayout = dl,
+                             moduleTargetTriple = tt})
   ghcInternalFunctions
   cmmMetaLlvmPrelude
 
@@ -95,7 +94,9 @@ llvmCodeGen' platform cmm_stream = do
   _ <- Stream.collect llvmStream
 
   -- Declare aliases for forward references
-  outputLlvm $ outputLlvmData =<< generateAliases
+  aliases <- generateAliases
+  let defs = outputLlvmData aliases
+  outputLlvm defs
 
   -- Postamble
   cmmUsedLlvmGens
@@ -182,7 +183,7 @@ cmmLlvmGen cmm@CmmProc{} = do
     (defs, ivars) <- fmap unzip $ mapM (outputLlvmCmmDecl itableSection) llvmBC
 
     -- Output, note down used variables
-    outputLlvm defs
+    outputLlvm (concat defs)
     mapM_ markUsedVar $ concat ivars
 
 cmmLlvmGen _ = return ()
