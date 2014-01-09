@@ -33,8 +33,6 @@ import Unique
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
-import LLVM.General
-
 type LlvmStatements = OrdList LlvmStatement
 
 -- -----------------------------------------------------------------------------

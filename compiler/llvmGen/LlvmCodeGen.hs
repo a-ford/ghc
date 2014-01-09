@@ -12,7 +12,7 @@ import Llvm.TypeConversions
 import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
-import LlvmCodeGen.Ppr
+--import LlvmCodeGen.Ppr
 import LlvmCodeGen.Output
 import LlvmCodeGen.Regs
 import LlvmMangler
@@ -37,7 +37,6 @@ import Data.IORef ( writeIORef )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
-import LLVM.General
 import LLVM.General.AST
 
 -- -----------------------------------------------------------------------------

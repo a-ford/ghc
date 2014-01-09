@@ -15,10 +15,8 @@ import LlvmCodeGen.Data
 
 import CLabel
 import Cmm
-import Platform
 
 import FastString
-import Outputable
 import Unique
 
 import LLVM.General.AST

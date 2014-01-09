@@ -39,7 +39,6 @@ module LlvmCodeGen.Base (
 import Llvm
 import LlvmCodeGen.Regs
 import Llvm.CodeOutput
-import Llvm.TypeConversions
 
 import CLabel
 import CodeGen.Platform ( activeStgRegs )

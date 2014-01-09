@@ -19,7 +19,6 @@ import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.InlineAssembly as IA
 
 import Data.Maybe
-import Data.Word
 
 --------------------------------------------------------------------------------
 -- * Top Level Output functions
